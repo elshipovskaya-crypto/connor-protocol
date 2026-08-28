@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Протокол Коннор</title>
 <meta name="theme-color" content="#3d4d52">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -1179,22 +1182,20 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) rend
 window.addEventListener("focus", renderAll);
 
 // ---------------------------------------------------------------------
-// PWA: manifest уже подключен выше. На каждой загрузке сначала убираем
-// ЛЮБОЙ уже установленный на устройстве сервис-воркер (мог зависнуть в
-// старой версии с агрессивным кэшем) и ставим свежий заново с
-// updateViaCache:"none" — это запрещает браузеру когда-либо отдавать
-// сам файл sw.js из HTTP-кэша, только с сервера. Немного лишней сетевой
-// работы при каждом открытии, зато обновления гарантированно долетают.
+// PWA: кэширование через сервис-воркер намеренно ОТКЛЮЧЕНО на время активной
+// доработки — оно несколько раз подряд становилось причиной путаницы (старая
+// версия логики тихо продолжала работать на телефоне после обновления файлов
+// на GitHub). Пока идёт быстрая доработка, свежесть важнее офлайн-доступа.
+// Ниже — только одноразовая очистка: если на устройстве уже стоит старый
+// сервис-воркер с прошлых версий, он снимается, чтобы не мешал. Новый не
+// ставится вообще, поэтому каждое открытие идёт напрямую в сеть за
+// актуальными файлами. Сам файл sw.js оставлен в проекте на будущее — когда
+// логика стабилизируется, регистрацию можно будет вернуть (см. README).
 // ---------------------------------------------------------------------
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.getRegistrations()
-      .then((regs) => Promise.all(regs.map((r) => r.unregister())))
-      .catch(() => {})
-      .finally(() => {
-        navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(() => {});
-      });
-  });
+  navigator.serviceWorker.getRegistrations()
+    .then((regs) => Promise.all(regs.map((r) => r.unregister())))
+    .catch(() => {});
 }
 </script>
 </body>
