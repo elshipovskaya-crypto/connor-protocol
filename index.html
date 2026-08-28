@@ -1,0 +1,1143 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Протокол Коннор</title>
+<meta name="theme-color" content="#3d4d52">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #f3f1eb; --surface: #ffffff; --surface-2: #ebe8e0;
+    --ink: #201f1c; --ink-soft: #4c4a45; --muted: #8a8579; --line: #ddd8cc;
+    --accent: #3d4d52; --accent-soft: #e4e9ea;
+    --warn: #a8402b; --warn-soft: #f3e2dd;
+    --good: #4c6b4f; --good-soft: #e4ecdf;
+    --radius: 3px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1a1917; --surface: #232220; --surface-2: #2b2a27;
+      --ink: #ece9e2; --ink-soft: #b8b4aa; --muted: #8a8579; --line: #3a3833;
+      --accent: #8fa8ad; --accent-soft: #2a3436;
+      --warn: #d97a5f; --warn-soft: #3a2620;
+      --good: #93b48f; --good-soft: #263127;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1a1917; --surface: #232220; --surface-2: #2b2a27;
+    --ink: #ece9e2; --ink-soft: #b8b4aa; --muted: #8a8579; --line: #3a3833;
+    --accent: #8fa8ad; --accent-soft: #2a3436;
+    --warn: #d97a5f; --warn-soft: #3a2620;
+    --good: #93b48f; --good-soft: #263127;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 15.5px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+    padding-bottom: 76px;
+  }
+  .mono { font-family: "IBM Plex Mono", monospace; }
+  h1, h2, h3 { font-family: "Archivo", sans-serif; font-weight: 600; margin: 0; }
+  button { font-family: inherit; }
+  input, select { font-family: inherit; font-size: inherit; }
+
+  /* ---------- Top bar ---------- */
+  header.top {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+    padding: 16px 18px 14px;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  }
+  header.top .brand { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+  header.top .rank {
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px;
+    color: var(--accent); background: var(--accent-soft);
+    padding: 3px 9px; border-radius: 3px; white-space: nowrap;
+  }
+
+  main { max-width: 640px; margin: 0 auto; padding: 18px 16px 8px; }
+  .view { display: none; flex-direction: column; gap: 18px; }
+  .view.active { display: flex; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 18px 18px;
+  }
+  .card-label {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); margin: 0 0 10px;
+  }
+
+  /* ---------- Stat bars ---------- */
+  .stat-row { display: grid; grid-template-columns: 96px 1fr 46px; align-items: center; gap: 12px; padding: 7px 0; }
+  .stat-row + .stat-row { border-top: 1px solid var(--line); }
+  .stat-name { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--ink-soft); }
+  .stat-track { height: 7px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+  .stat-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width .3s ease; }
+  .stat-val { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 12px; text-align: center; }
+  .kpi .n { font-family: "IBM Plex Mono", monospace; font-size: 1.3rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .kpi .l { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* daily quest rows */
+  .quest { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+  .quest + .quest { border-top: 1px solid var(--line); }
+  .quest .qname { flex: 1; font-size: 14px; }
+  .quest input[type="number"] {
+    width: 76px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 3px;
+    background: var(--surface-2); color: var(--ink); text-align: right;
+  }
+  .quest .unit { font-size: 12px; color: var(--muted); width: 32px; }
+  .check {
+    width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--line);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    font-size: 13px; color: transparent; cursor: pointer; background: var(--surface);
+  }
+  .check.done { background: var(--good); border-color: var(--good); color: #fff; }
+
+  /* week strip (calendar) */
+  .weekstrip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .daycard {
+    border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface);
+    padding: 8px 6px; min-height: 92px; display: flex; flex-direction: column; gap: 5px;
+    cursor: pointer; text-align: center;
+  }
+  .daycard .dow { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  .daycard .num { font-family: "Archivo", sans-serif; font-weight: 600; font-size: 14px; }
+  .daycard .tags { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+  .daycard .tagchip {
+    font-family: "IBM Plex Mono", monospace; font-size: 8.5px; letter-spacing: 0.03em; text-transform: uppercase;
+    background: var(--accent-soft); color: var(--accent); border-radius: 2px; padding: 1px 3px;
+  }
+  .daycard .restlabel { font-size: 9.5px; color: var(--muted); font-style: italic; margin-top: 2px; }
+  .daycard.today { outline: 1.5px solid var(--accent); outline-offset: -1.5px; }
+  .daycard.selected { background: var(--accent-soft); }
+  .daycard.complete { border-color: var(--good); }
+  .daycard .check-mini { font-size: 11px; color: var(--good); margin-top: auto; }
+  .start-banner {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--accent);
+    background: var(--accent-soft); padding: 8px 12px; border-radius: 3px; margin-bottom: 4px;
+  }
+  .preview-note { font-size: 12.5px; color: var(--muted); font-style: italic; }
+
+  /* slot cards (today) */
+  .slot-card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .slot-card.done { border-color: var(--good); background: var(--good-soft); }
+  .slot-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .slot-tag { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); padding: 2px 8px; border-radius: 3px; }
+  .slot-title { font-family: "Archivo", sans-serif; font-weight: 600; font-size: 14.5px; }
+  .slot-ex { font-size: 13px; color: var(--ink-soft); }
+  .slot-ex ul { margin: 4px 0 0; padding-left: 18px; }
+  .row-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  select.source {
+    padding: 6px 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface-2); color: var(--ink); font-size: 12.5px;
+  }
+  button.btn {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: 0.03em;
+    padding: 8px 14px; border-radius: 3px; border: 1px solid var(--accent);
+    background: var(--accent); color: #fff; cursor: pointer;
+  }
+  button.btn.secondary { background: transparent; color: var(--accent); }
+  button.btn.done { background: var(--good); border-color: var(--good); }
+  button.btn:disabled { opacity: .55; cursor: default; }
+  .rest-note { font-size: 12.5px; color: var(--muted); font-style: italic; }
+
+  /* ladder */
+  .ladder { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .rank-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface); }
+  .rank-row:nth-child(even) { background: var(--surface-2); }
+  .rank-row .n { font-family: "IBM Plex Mono", monospace; color: var(--muted); font-size: 12px; width: 18px; }
+  .rank-row .t { font-weight: 600; font-family: "Archivo", sans-serif; font-size: 13.5px; flex: 1; }
+  .rank-row .req { font-size: 11.5px; color: var(--muted); }
+  .rank-row.current { outline: 1.5px solid var(--accent); outline-offset: -1.5px; }
+  .rank-row.current .t { color: var(--accent); }
+  .rank-row.cleared .t { color: var(--good); }
+
+  /* boss form */
+  .field { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; }
+  .field + .field { border-top: 1px solid var(--line); }
+  .field .flabel { font-size: 13.5px; flex: 1; }
+  .field .fthresh { font-size: 11.5px; color: var(--muted); font-family: "IBM Plex Mono", monospace; }
+  .field input[type="number"] { width: 70px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface-2); color: var(--ink); text-align: right; }
+  .field input[type="checkbox"] { width: 20px; height: 20px; }
+  .pill { display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: 10.5px; padding: 2px 7px; border-radius: 3px; }
+  .pill.good { background: var(--good-soft); color: var(--good); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+
+  .history-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; font-size: 13px; }
+  .history-row + .history-row { border-top: 1px solid var(--line); }
+  .history-row .d { color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 11.5px; }
+
+  .empty { font-size: 13px; color: var(--muted); font-style: italic; padding: 6px 0; }
+
+  textarea, input[type="text"] {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 3px;
+    background: var(--surface-2); color: var(--ink); font-size: 13.5px;
+  }
+  .meas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .meas-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+  .meas-grid input { padding: 7px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface-2); color: var(--ink); }
+
+  /* bottom nav */
+  nav.tabbar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+    background: var(--surface); border-top: 1px solid var(--line);
+    display: flex; padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+  }
+  nav.tabbar button {
+    flex: 1; background: none; border: none; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 6px 2px; color: var(--muted); font-size: 10.5px;
+    font-family: "IBM Plex Mono", monospace; letter-spacing: 0.02em;
+  }
+  nav.tabbar button .ic { font-size: 17px; line-height: 1; }
+  nav.tabbar button.active { color: var(--accent); }
+
+  .toast {
+    position: fixed; bottom: 88px; left: 50%; transform: translateX(-50%) translateY(10px);
+    background: var(--ink); color: var(--bg); font-size: 13px; padding: 9px 16px;
+    border-radius: 4px; opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+    z-index: 30; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (min-width: 720px) {
+    body { padding-bottom: 0; }
+    nav.tabbar { position: sticky; bottom: auto; top: 0; order: -1; border-top: none; border-bottom: 1px solid var(--line); max-width: 640px; margin: 0 auto; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <span class="brand">Протокол Коннор</span>
+  <span class="rank mono" id="hdrRank">Цивильная</span>
+</header>
+
+<main>
+
+  <!-- ============ DASHBOARD ============ -->
+  <section class="view active" id="view-dash">
+    <div class="kpis">
+      <div class="kpi"><div class="n" id="kpiStreak">0</div><div class="l">стрик, дней</div></div>
+      <div class="kpi"><div class="n" id="kpiWeek">0/0</div><div class="l">трен. на неделе</div></div>
+      <div class="kpi"><div class="n" id="kpiXp">0</div><div class="l">опыт всего</div></div>
+    </div>
+
+    <div class="card">
+      <p class="card-label">Статы персонажа</p>
+      <div id="statBars"></div>
+    </div>
+
+    <div class="card">
+      <p class="card-label">Ежедневные квесты — сегодня</p>
+      <div class="quest">
+        <span class="qname">Белок, г (цель 120–140)</span>
+        <input type="number" id="inProtein" min="0" step="1">
+      </div>
+      <div class="quest">
+        <span class="qname">Шаги (цель 10 000)</span>
+        <input type="number" id="inSteps" min="0" step="100">
+      </div>
+      <div class="quest">
+        <span class="qname">Вес, кг</span>
+        <input type="number" id="inWeight" min="0" step="0.1">
+      </div>
+      <div class="row-btns" style="margin-top:8px;">
+        <button class="btn" id="btnSaveDaily">Сохранить</button>
+        <span class="empty" id="dailySavedNote"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TODAY ============ -->
+  <section class="view" id="view-today">
+    <div id="startBanner"></div>
+    <div class="card">
+      <p class="card-label">Эта неделя</p>
+      <div class="weekstrip" id="weekStrip"></div>
+    </div>
+    <div class="card">
+      <p class="card-label" id="dayLabel">Сегодня — <span id="todayName"></span></p>
+      <p class="preview-note" id="previewNote" style="display:none;"></p>
+      <div id="todaySlots" style="display:flex; flex-direction:column; gap:10px;"></div>
+    </div>
+  </section>
+
+  <!-- ============ QUESTS / HISTORY ============ -->
+  <section class="view" id="view-quests">
+    <div class="card">
+      <p class="card-label">Челленджи</p>
+      <div id="challenges" style="display:flex; flex-direction:column; gap:14px;"></div>
+    </div>
+    <div class="card">
+      <p class="card-label">Эта неделя</p>
+      <div id="weekProgress"></div>
+    </div>
+    <div class="card">
+      <p class="card-label">История по дням (14 дней)</p>
+      <div id="dailyHistory"></div>
+    </div>
+    <div class="card">
+      <p class="card-label">Замеры</p>
+      <div class="meas-grid">
+        <label>Талия, см <input type="number" id="mWaist"></label>
+        <label>Бёдра, см <input type="number" id="mHips"></label>
+        <label>Грудь, см <input type="number" id="mChest"></label>
+        <label>Бицепс, см <input type="number" id="mArm"></label>
+      </div>
+      <button class="btn" id="btnSaveMeas">Записать замеры</button>
+      <div id="measHistory" style="margin-top:10px;"></div>
+    </div>
+  </section>
+
+  <!-- ============ BOSS ============ -->
+  <section class="view" id="view-boss">
+    <div class="card">
+      <p class="card-label">Следующий босс</p>
+      <h2 id="bossTitle">—</h2>
+      <p class="empty" id="bossSubtitle"></p>
+      <div id="bossFields" style="margin-top:10px;"></div>
+      <button class="btn" id="btnRunBoss" style="margin-top:12px;">Оценить результат</button>
+      <div id="bossResult" style="margin-top:10px;"></div>
+    </div>
+    <div class="card">
+      <p class="card-label">История боссов</p>
+      <div id="bossHistory"></div>
+    </div>
+  </section>
+
+  <!-- ============ CHARACTER ============ -->
+  <section class="view" id="view-char">
+    <div class="card">
+      <p class="card-label">Лестница рангов</p>
+      <div class="ladder" id="ladder"></div>
+    </div>
+    <div class="card">
+      <p class="card-label">Дата старта программы</p>
+      <div class="row-btns">
+        <input type="date" id="startDateInput" style="padding:7px 9px; border:1px solid var(--line); border-radius:3px; background:var(--surface-2); color:var(--ink);">
+        <button class="btn" id="btnSaveStartDate">Сохранить</button>
+      </div>
+      <p class="empty" id="startDateNote" style="margin-top:8px;"></p>
+    </div>
+    <div class="card">
+      <p class="card-label">Статы</p>
+      <div id="statBars2"></div>
+    </div>
+    <div class="card">
+      <p class="card-label">История статов — по неделям</p>
+      <div id="statHistory" style="display:flex; flex-direction:column; gap:10px;"></div>
+      <p class="empty" style="margin-top:8px;">Точка — конец недели. График копится с этого обновления приложения, поэтому первое время точек будет мало — это нормально, дальше линия начнёт вытягиваться.</p>
+    </div>
+    <div class="card">
+      <p class="card-label">Сброс (для теста приложения)</p>
+      <button class="btn secondary" id="btnReset">Сбросить весь прогресс</button>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabbar">
+  <button data-view="dash" class="active"><span class="ic">◧</span>Дашборд</button>
+  <button data-view="today"><span class="ic">▣</span>Сегодня</button>
+  <button data-view="quests"><span class="ic">☰</span>Квесты</button>
+  <button data-view="boss"><span class="ic">◆</span>Босс</button>
+  <button data-view="char"><span class="ic">☺</span>Персонаж</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ======================================================================
+   ПРОТОКОЛ КОННОР — скелет приложения
+   Хранение: localStorage, ключ "connorProtocolState"
+   ====================================================================== */
+
+const STORE_KEY = "connorProtocolState";
+
+const STATS = ["STR","END","FLEX","BAL","COORD","DISC"];
+const STAT_LABELS = { STR:"СИЛ", END:"ВЫН", FLEX:"КОНТ", BAL:"БАЛ", COORD:"КООРД", DISC:"ДИСЦ" };
+
+// -------- Ранги: имя, порог опыта для перехода, тренировок/нед, ключ недельного плана
+const RANKS = [
+  { key:"civilian",   name:"Цивильная",           xpFloor:0,    sessionsPerWeek:5, weekPlan:"start" },
+  { key:"recruit",    name:"Новобранец",          xpFloor:120,  sessionsPerWeek:6, weekPlan:"grow"  },
+  { key:"trainee",    name:"Стажёр",               xpFloor:320,  sessionsPerWeek:7, weekPlan:"build" },
+  { key:"resistance", name:"Боец Сопротивления",   xpFloor:600,  sessionsPerWeek:8, weekPlan:"full"  },
+  { key:"operative",  name:"Полевой Оперативник",  xpFloor:900,  sessionsPerWeek:8, weekPlan:"full"  },
+  { key:"connor",     name:"Sarah Connor",         xpFloor:1300, sessionsPerWeek:8, weekPlan:"full"  },
+];
+// Пороги опыта — предварительные, откалибруются по факту использования.
+
+// -------- Недельные планы (ключ — день недели JS: 0=Вс..6=Сб)
+// slot: {type, label, focus — какую часть тела/направление тренируем, xp, allowFitstars?}
+// Без привязки к конкретным упражнениям — приложение не диктует библиотеку,
+// только область фокуса; что именно делать в рамках фокуса, решает сама
+// пользовательница (свои упражнения, YouTube, FitStars и т.д.).
+const WEEK_PLANS = {
+  start: { // Цивильная: 2 силовых + 2 табаты + 1 аштанга = 5
+    1: [{type:"tabata", label:"Табата (4 раунда)", focus:"Всё тело — кондиционка", xp:{END:6}}],
+    2: [{type:"ashtanga", label:"Аштанга — база", focus:"Растяжка, дыхание, контроль", xp:{FLEX:6}}],
+    3: [{type:"strength", label:"Силовая A (лёгкая)", focus:"Всё тело", xp:{STR:6}, allowFitstars:true}],
+    4: [{type:"tabata", label:"Табата (4 раунда)", focus:"Всё тело — кондиционка", xp:{END:6}}],
+    5: [{type:"strength", label:"Силовая Б (лёгкая)", focus:"Всё тело", xp:{STR:6}, allowFitstars:true}],
+    6: [],
+    0: [{type:"rest", label:"Отдых + замеры"}],
+  },
+  grow: { // Новобранец: 3 силовых + 2 табаты (6 раундов) + 1 аштанга
+    1: [{type:"tabata", label:"Табата (6 раундов)", focus:"Всё тело — кондиционка", xp:{END:8}}],
+    2: [{type:"ashtanga", label:"Аштанга — стоячая часть", focus:"Баланс и контроль", xp:{FLEX:8}}],
+    3: [{type:"strength", label:"Силовая A", focus:"Низ тела + спина", xp:{STR:9}, allowFitstars:true}],
+    4: [{type:"tabata", label:"Табата (6 раундов)", focus:"Всё тело — кондиционка", xp:{END:8}}],
+    5: [{type:"strength", label:"Силовая В", focus:"Всё тело", xp:{STR:9}, allowFitstars:true}],
+    6: [{type:"strength", label:"Силовая Б", focus:"Верх тела", xp:{STR:9}, allowFitstars:true}],
+    0: [{type:"rest", label:"Отдых + замеры"}],
+  },
+  build: { // Стажёр: 3 силовых + 2 табаты (8 раундов) + 2 аштанги, дрилы пловца/сёрфера
+    1: [{type:"tabata", label:"Табата (8 раундов)", focus:"Всё тело — высокая интенсивность", xp:{END:10}}],
+    2: [{type:"ashtanga", label:"Аштанга — стоячая серия", focus:"Баланс и контроль", xp:{FLEX:10}}],
+    3: [{type:"strength", label:"Силовая A", focus:"Спина + баланс пловца", xp:{STR:10, BAL:4}, allowFitstars:true}],
+    4: [{type:"tabata", label:"Табата (8 раундов)", focus:"Всё тело — высокая интенсивность", xp:{END:10}}],
+    5: [{type:"ashtanga", label:"Аштанга — сидячая часть", focus:"Гибкость", xp:{FLEX:6}},
+        {type:"strength", label:"Силовая В", focus:"Всё тело", xp:{STR:9}, allowFitstars:true}],
+    6: [{type:"strength", label:"Силовая Б", focus:"Низ тела + баланс сёрфера", xp:{STR:10, BAL:4}, allowFitstars:true}],
+    0: [{type:"rest", label:"Отдых + замеры"}],
+  },
+  full: { // Боец Сопротивления и выше: 4 силовых + 2 табаты + 2 аштанги + animal flow
+    1: [{type:"tabata", label:"Табата (8 раундов)", focus:"Всё тело — высокая интенсивность", xp:{END:12}},
+        {type:"strength", label:"Силовая A", focus:"Всё тело + спина", xp:{STR:12}, allowFitstars:true}],
+    2: [{type:"ashtanga", label:"Аштанга, серия 1 (ч.1)", focus:"Гибкость и контроль", xp:{FLEX:12}}],
+    3: [{type:"strength", label:"Силовая Б", focus:"Верх тела + баланс пловца", xp:{STR:12, BAL:5}, allowFitstars:true}],
+    4: [{type:"tabata", label:"Табата (8 раундов)", focus:"Всё тело — высокая интенсивность", xp:{END:12}},
+        {type:"animalflow", label:"Animal Flow", focus:"Координация, всё тело", xp:{COORD:10}}],
+    5: [{type:"ashtanga", label:"Аштанга, серия 1 (ч.2)", focus:"Гибкость", xp:{FLEX:10}},
+        {type:"strength", label:"Силовая Г", focus:"Спина + кор", xp:{STR:10}, allowFitstars:true}],
+    6: [{type:"strength", label:"Силовая В", focus:"Низ тела + баланс сёрфера", xp:{STR:12, BAL:5}, allowFitstars:true}],
+    0: [{type:"rest", label:"Отдых + замеры"}],
+  },
+};
+
+// -------- Челленджи: сквозные достижения поверх дневных/недельных циклов
+const CHALLENGE_DEFS = [
+  { key:"no_skip_28", title:"«Я вернусь»", desc:"28 дней подряд без пропуска запланированных тренировок.", target:28,
+    check: (d) => {
+      const slots = planForDate(d).filter(s => s.type !== "rest");
+      if (slots.length === 0) return true;
+      const log = state.dailyLogs[todayKey(d)];
+      return !!log && (log.workoutIds||[]).length >= slots.length;
+    }
+  },
+  { key:"protein_30", title:"«Судного дня не будет»", desc:"30 дней подряд норма белка (120 г и больше).", target:30,
+    check: (d) => { const log = state.dailyLogs[todayKey(d)]; return !!log && log.proteinG >= 120; }
+  },
+  { key:"steps_14", title:"«Разведка боем»", desc:"14 дней подряд 10 000+ шагов.", target:14,
+    check: (d) => { const log = state.dailyLogs[todayKey(d)]; return !!log && log.steps >= 10000; }
+  },
+  { key:"am_streak_14", title:"«Подъём до рассвета»", desc:"14 дней подряд утренняя тренировка (табата/аштанга) закрыта в срок.", target:14,
+    check: (d) => {
+      const slots = planForDate(d).filter(s => s.type === "tabata" || s.type === "ashtanga");
+      if (slots.length === 0) return true;
+      const done = state.workouts.filter(w => w.date === todayKey(d) && (w.type === "tabata" || w.type === "ashtanga")).length;
+      return done >= slots.length;
+    }
+  },
+];
+
+// -------- Боссы (пороги для перехода НА указанный ранг)
+const BOSS_DEFS = {
+  recruit: { title:"Босс I — базовая компетентность", fields:[
+    {key:"pushups", label:"Отжимания строгие, повт.", th:10, cmp:"gte"},
+    {key:"row", label:"Тяга в наклоне/резинка, повт.", th:15, cmp:"gte"},
+    {key:"tabata", label:"Табата, раундов завершено", th:8, cmp:"gte"},
+    {key:"ashtanga", label:"Сурья А/Б — чистая форма", th:1, cmp:"bool"},
+    {key:"balance", label:"Баланс на одной ноге, сек", th:20, cmp:"gte"},
+    {key:"disc", label:"Выполнение квестов за 30 дней, %", th:80, cmp:"gte"},
+  ]},
+  trainee: { title:"Босс II — сила и кондиционка", fields:[
+    {key:"pushups", label:"Отжимания строгие, повт.", th:18, cmp:"gte"},
+    {key:"row", label:"Тяга в наклоне/резинка, повт.", th:20, cmp:"gte"},
+    {key:"tabata", label:"Табата, раундов завершено", th:8, cmp:"gte"},
+    {key:"ashtanga", label:"Стоячая последовательность — чисто", th:1, cmp:"bool"},
+    {key:"balance", label:"Баланс на одной ноге, сек", th:30, cmp:"gte"},
+    {key:"disc", label:"Выполнение квестов за 30 дней, %", th:82, cmp:"gte"},
+  ]},
+  resistance: { title:"Босс III — компетентность по всем статам", fields:[
+    {key:"pushups", label:"Отжимания строгие, повт.", th:25, cmp:"gte"},
+    {key:"row", label:"Тяга в наклоне/резинка, повт.", th:25, cmp:"gte"},
+    {key:"tabata", label:"Табата, раундов завершено", th:8, cmp:"gte"},
+    {key:"ashtanga", label:"Сидячая серия — чисто", th:1, cmp:"bool"},
+    {key:"balance", label:"Баланс на одной ноге, сек", th:40, cmp:"gte"},
+    {key:"popup", label:"Поп-ап, сек (меньше — лучше)", th:1.5, cmp:"lte"},
+    {key:"flow", label:"Animal flow, чистых переходов", th:4, cmp:"gte"},
+    {key:"disc", label:"Выполнение квестов за 30 дней, %", th:85, cmp:"gte"},
+  ]},
+  operative: { title:"Босс IV — нагрузка, удержание, баланс", fields:[
+    {key:"pushups", label:"Отжимания строгие, повт.", th:32, cmp:"gte"},
+    {key:"pullups", label:"Подтягивания строгие, повт.", th:4, cmp:"gte"},
+    {key:"tabata", label:"Табата, раундов завершено", th:8, cmp:"gte"},
+    {key:"ashtanga", label:"Первая серия целиком — чисто", th:1, cmp:"bool"},
+    {key:"balance", label:"Баланс на одной ноге, сек", th:50, cmp:"gte"},
+    {key:"popup", label:"Поп-ап, сек", th:1.2, cmp:"lte"},
+    {key:"flow", label:"Animal flow, чистых переходов", th:4, cmp:"gte"},
+    {key:"disc", label:"Выполнение квестов за 30 дней, %", th:88, cmp:"gte"},
+  ]},
+  connor: { title:"Босс V — Гаунтлет Т-1000 (финал)", fields:[
+    {key:"pushups", label:"Отжимания строгие, повт.", th:40, cmp:"gte"},
+    {key:"pullups", label:"Подтягивания строгие, повт.", th:8, cmp:"gte"},
+    {key:"plank", label:"Планка, сек", th:180, cmp:"gte"},
+    {key:"rollout", label:"Роллаут на ролике, повт.", th:10, cmp:"gte"},
+    {key:"tabata", label:"Табата, раундов завершено", th:8, cmp:"gte"},
+    {key:"ashtanga", label:"Первая серия целиком — чисто", th:1, cmp:"bool"},
+    {key:"balance", label:"Баланс, закрытые глаза, сек", th:60, cmp:"gte"},
+    {key:"popup", label:"Поп-ап, сек", th:1.0, cmp:"lte"},
+    {key:"pistol", label:"Пистолетик, повт. на ногу", th:5, cmp:"gte"},
+    {key:"handstand", label:"Стойка на руках у стены, сек", th:30, cmp:"gte"},
+    {key:"flow", label:"Animal flow, чистых переходов", th:4, cmp:"gte"},
+    {key:"disc", label:"Выполнение квестов за 90 дней, %", th:90, cmp:"gte"},
+  ]},
+};
+
+const DAY_NAMES = ["Воскресенье","Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
+const DAY_SHORT = ["ВС","ПН","ВТ","СР","ЧТ","ПТ","СБ"];
+const SLOT_ABBR = { tabata:"Табата", ashtanga:"Аштанга", strength:"Силовая", animalflow:"Флоу", rest:"Отдых" };
+
+// день, который сейчас просматривается в разделе «Сегодня» (по умолчанию — реальный сегодняшний)
+let selectedDate = new Date();
+
+// ---------------------------------------------------------------------
+// STATE
+// ---------------------------------------------------------------------
+function defaultState() {
+  return {
+    character: { rankKey: "civilian", xpTotal: 0, stats: {STR:0,END:0,FLEX:0,BAL:0,COORD:0,DISC:0} },
+    dailyLogs: {},      // date -> {proteinG, steps, weightKg, workoutIds:[]}
+    weeklyLogs: {},      // weekStart(date) -> {measurements:[], sessionsDone}
+    workouts: [],        // {id, date, type, label, source, xp}
+    bossTests: [],        // {id, targetRankKey, date, values:{}, passed, failedFields:[]}
+    measurements: [],     // {date, waist, hips, chest, arm}
+    statHistory: [],      // {date, stats:{...}} — один снимок в день, для графика по неделям
+    challengeMeta: {},    // key -> {prevStreak, timesCompleted, lastCompletedDate}
+    settings: { startDate: null }, // дата старта программы, YYYY-MM-DD
+  };
+}
+let state = load();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return defaultState();
+    const parsed = JSON.parse(raw);
+    return Object.assign(defaultState(), parsed);
+  } catch (e) { return defaultState(); }
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+function todayKey(d = new Date()) { return d.toISOString().slice(0,10); }
+function weekStartKey(d = new Date()) {
+  const day = d.getDay(); // 0=Sun
+  const diff = (day === 0 ? 6 : day - 1); // days since Monday
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - diff);
+  return todayKey(monday);
+}
+function getRank(key) { return RANKS.find(r => r.key === key); }
+function rankIndex(key) { return RANKS.findIndex(r => r.key === key); }
+function nextRank(key) { return RANKS[rankIndex(key) + 1]; }
+function planForDate(d) {
+  const rank = getRank(state.character.rankKey);
+  return WEEK_PLANS[rank.weekPlan][d.getDay()] || [];
+}
+function computeChallengeStreak(check) {
+  let streak = 0;
+  const d = new Date();
+  while (streak < 400) {
+    if (check(d)) { streak++; d.setDate(d.getDate() - 1); } else break;
+  }
+  return streak;
+}
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._h);
+  toast._h = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+// ---------------------------------------------------------------------
+// XP / STATS
+// ---------------------------------------------------------------------
+function addXp(map) {
+  let total = 0;
+  for (const k in map) {
+    state.character.stats[k] = Math.min(100, (state.character.stats[k] || 0) + map[k]);
+    total += map[k];
+  }
+  state.character.xpTotal += total;
+  snapshotStats();
+}
+
+// -------- История статов: один снимок в день, используется для графика по неделям
+function snapshotStats() {
+  const key = todayKey();
+  const entry = { date: key, stats: { ...state.character.stats } };
+  const idx = state.statHistory.findIndex(s => s.date === key);
+  if (idx >= 0) state.statHistory[idx] = entry; else state.statHistory.push(entry);
+  if (state.statHistory.length > 200) state.statHistory.shift();
+}
+
+function weekEndDates(weeksCount) {
+  const dates = [];
+  const day = new Date().getDay(); // 0=Вс
+  const diffToSunday = (7 - day) % 7;
+  const base = new Date();
+  base.setDate(base.getDate() + diffToSunday);
+  base.setHours(0,0,0,0);
+  for (let i = weeksCount - 1; i >= 0; i--) {
+    const d = new Date(base);
+    d.setDate(base.getDate() - 7 * i);
+    dates.push(d);
+  }
+  return dates;
+}
+
+function valueAtOrBefore(statKey, dateObj) {
+  const dStr = todayKey(dateObj);
+  const sorted = state.statHistory.slice().sort((a,b) => a.date.localeCompare(b.date));
+  let val = 0, found = false;
+  for (const entry of sorted) {
+    if (entry.date <= dStr) { val = entry.stats[statKey] || 0; found = true; } else break;
+  }
+  return found ? val : 0;
+}
+
+function weeklySeries(statKey, weeksCount = 10) {
+  return weekEndDates(weeksCount).map(d => valueAtOrBefore(statKey, d));
+}
+
+function drawSparkline(canvas, values, maxVal = 100) {
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const styles = getComputedStyle(document.documentElement);
+  const lineColor = styles.getPropertyValue("--line").trim();
+  const accent = styles.getPropertyValue("--accent").trim();
+  ctx.strokeStyle = lineColor; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, h - 1); ctx.lineTo(w, h - 1); ctx.stroke();
+  if (!values.length || values.every(v => v === 0)) return;
+  const stepX = w / Math.max(1, values.length - 1);
+  ctx.strokeStyle = accent; ctx.lineWidth = 1.6; ctx.beginPath();
+  values.forEach((v, i) => {
+    const x = i * stepX, y = h - (v / maxVal) * h;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  const lastX = (values.length - 1) * stepX, lastY = h - (values[values.length-1] / maxVal) * h;
+  ctx.fillStyle = accent; ctx.beginPath(); ctx.arc(lastX, lastY, 2.3, 0, Math.PI*2); ctx.fill();
+}
+
+// -------- Прогресс челленджей: живой стрик + сохранённый счётчик выполнений
+function updateChallengeMeta(key, streak, target) {
+  const meta = state.challengeMeta[key] || { prevStreak: 0, timesCompleted: 0, lastCompletedDate: null };
+  if (streak >= target && meta.prevStreak < target) {
+    meta.timesCompleted += 1;
+    meta.lastCompletedDate = todayKey();
+  }
+  meta.prevStreak = streak;
+  state.challengeMeta[key] = meta;
+  return meta;
+}
+
+// ---------------------------------------------------------------------
+// RENDER: helpers
+// ---------------------------------------------------------------------
+function renderStatBars(container) {
+  container.innerHTML = "";
+  STATS.forEach(k => {
+    const v = state.character.stats[k] || 0;
+    const row = document.createElement("div");
+    row.className = "stat-row";
+    row.innerHTML = `
+      <span class="stat-name">${STAT_LABELS[k]}</span>
+      <div class="stat-track"><div class="stat-fill" style="width:${v}%"></div></div>
+      <span class="stat-val">${v}/100</span>`;
+    container.appendChild(row);
+  });
+}
+
+function currentStreak() {
+  let streak = 0;
+  let d = new Date();
+  for (;;) {
+    const log = state.dailyLogs[todayKey(d)];
+    const ok = log && log.proteinG >= 100 && log.steps >= 8000 && log.weightKg;
+    if (!ok) break;
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
+function renderDashboard() {
+  const rank = getRank(state.character.rankKey);
+  document.getElementById("hdrRank").textContent = rank.name;
+  renderStatBars(document.getElementById("statBars"));
+  document.getElementById("kpiStreak").textContent = currentStreak();
+  document.getElementById("kpiXp").textContent = state.character.xpTotal;
+
+  const wk = weekStartKey();
+  const wLog = state.weeklyLogs[wk] || { sessionsDone: 0 };
+  document.getElementById("kpiWeek").textContent = `${wLog.sessionsDone || 0}/${rank.sessionsPerWeek}`;
+
+  const dLog = state.dailyLogs[todayKey()] || {};
+  document.getElementById("inProtein").value = dLog.proteinG ?? "";
+  document.getElementById("inSteps").value = dLog.steps ?? "";
+  document.getElementById("inWeight").value = dLog.weightKg ?? "";
+}
+
+document.getElementById("btnSaveDaily").addEventListener("click", () => {
+  const key = todayKey();
+  const existing = state.dailyLogs[key] || { workoutIds: [] };
+  state.dailyLogs[key] = {
+    ...existing,
+    proteinG: Number(document.getElementById("inProtein").value) || 0,
+    steps: Number(document.getElementById("inSteps").value) || 0,
+    weightKg: Number(document.getElementById("inWeight").value) || null,
+  };
+  let disc = 0;
+  if (state.dailyLogs[key].proteinG >= 100) disc += 2;
+  if (state.dailyLogs[key].steps >= 8000) disc += 2;
+  if (state.dailyLogs[key].weightKg) disc += 2;
+  addXp({ DISC: disc });
+  save();
+  renderAll();
+  document.getElementById("dailySavedNote").textContent = "сохранено ✓";
+  setTimeout(() => document.getElementById("dailySavedNote").textContent = "", 1500);
+});
+
+// ---------------------------------------------------------------------
+// RENDER: календарь недели + «Сегодня»
+// ---------------------------------------------------------------------
+function startOfWeek(d) {
+  const day = d.getDay();
+  const diff = (day === 0 ? 6 : day - 1);
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - diff);
+  monday.setHours(0,0,0,0);
+  return monday;
+}
+function isSameDay(a, b) { return todayKey(a) === todayKey(b); }
+
+function renderStartBanner() {
+  const el = document.getElementById("startBanner");
+  const sd = state.settings.startDate;
+  if (!sd) { el.innerHTML = ""; return; }
+  const todayStr = todayKey();
+  if (todayStr < sd) {
+    const diffDays = Math.round((new Date(sd) - new Date(todayStr)) / 86400000);
+    el.innerHTML = `<div class="start-banner">Старт программы: ${sd} · через ${diffDays} дн. Пока можно смотреть план недели и тренироваться заранее, если хочется — счётчики и челленджи от этого не пострадают.</div>`;
+  } else {
+    el.innerHTML = "";
+  }
+}
+
+function renderWeekStrip() {
+  const rank = getRank(state.character.rankKey);
+  const plan = WEEK_PLANS[rank.weekPlan];
+  const monday = startOfWeek(new Date());
+  const wrap = document.getElementById("weekStrip");
+  wrap.innerHTML = "";
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const dow = d.getDay();
+    const slots = plan[dow] || [];
+    const isRest = slots.length === 0 || slots[0].type === "rest";
+    const key = todayKey(d);
+    const log = state.dailyLogs[key];
+    const nonRest = slots.filter(s => s.type !== "rest");
+    const doneCount = log ? (log.workoutIds || []).length : 0;
+    const complete = nonRest.length > 0 && doneCount >= nonRest.length;
+    const today = isSameDay(d, new Date());
+    const sel = isSameDay(d, selectedDate);
+
+    const card = document.createElement("div");
+    card.className = "daycard" + (today ? " today" : "") + (sel ? " selected" : "") + (complete ? " complete" : "");
+    const tags = isRest
+      ? `<div class="restlabel">Отдых</div>`
+      : `<div class="tags">${[...new Set(nonRest.map(s => SLOT_ABBR[s.type] || s.type))].map(t => `<span class="tagchip">${t}</span>`).join("")}</div>`;
+    card.innerHTML = `<span class="dow">${DAY_SHORT[dow]}</span><span class="num">${d.getDate()}</span>${tags}${complete ? '<span class="check-mini">✓</span>' : ''}`;
+    card.addEventListener("click", () => { selectedDate = d; renderToday(); });
+    wrap.appendChild(card);
+  }
+}
+
+function renderToday() {
+  renderStartBanner();
+  renderWeekStrip();
+
+  const rank = getRank(state.character.rankKey);
+  const plan = WEEK_PLANS[rank.weekPlan];
+  const dow = selectedDate.getDay();
+  const isToday = isSameDay(selectedDate, new Date());
+  document.getElementById("todayName").textContent = `${DAY_NAMES[dow]}, ${selectedDate.getDate()}.${String(selectedDate.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById("dayLabel").firstChild.textContent = isToday ? "Сегодня — " : "Просмотр дня — ";
+
+  const noteEl = document.getElementById("previewNote");
+  if (!isToday) {
+    noteEl.style.display = "block";
+    noteEl.textContent = "Это не сегодняшний день — просто предпросмотр плана. Отметить тренировку выполненной можно только для сегодняшнего дня.";
+  } else {
+    noteEl.style.display = "none";
+  }
+
+  const slots = plan[dow] || [];
+  const container = document.getElementById("todaySlots");
+  container.innerHTML = "";
+
+  if (slots.length === 0 || slots[0].type === "rest") {
+    container.innerHTML = `<p class="rest-note">${isToday ? "Сегодня" : "В этот день"} отдых. Хороший день для замеров и растяжки.</p>`;
+    return;
+  }
+
+  const key = todayKey(selectedDate);
+  const dLog = state.dailyLogs[key] || { workoutIds: [] };
+
+  slots.forEach((slot, i) => {
+    const slotId = `${key}-${dow}-${i}`;
+    const already = (dLog.workoutIds || []).includes(slotId);
+    const card = document.createElement("div");
+    card.className = "slot-card" + (already ? " done" : "");
+    const focusLine = slot.focus ? `<div class="slot-ex">Фокус: ${slot.focus}</div>` : "";
+    const sourceSelect = slot.allowFitstars
+      ? `<select class="source" id="src-${slotId}">
+           <option value="library">Источник: домашняя библиотека</option>
+           <option value="fitstars">Источник: FitStars (лёгкая программа)</option>
+         </select>`
+      : "";
+    const actionBtn = !isToday
+      ? ""
+      : `<button class="btn ${already ? 'done' : ''}" data-slot="${slotId}" ${already ? "disabled" : ""}>
+           ${already ? "Готово ✓" : "Отметить выполненным"}
+         </button>`;
+    card.innerHTML = `
+      <div class="slot-top">
+        <span class="slot-tag">${slot.type}</span>
+        ${already ? '<span class="pill good">выполнено</span>' : ''}
+      </div>
+      <div class="slot-title">${slot.label}</div>
+      ${focusLine}
+      <div class="row-btns">
+        ${isToday ? sourceSelect : ""}
+        ${actionBtn}
+      </div>`;
+    container.appendChild(card);
+
+    if (isToday && !already) {
+      card.querySelector("button[data-slot]").addEventListener("click", () => {
+        const srcEl = document.getElementById(`src-${slotId}`);
+        const source = srcEl ? srcEl.value : "library";
+        completeSlot(slotId, slot, source, key);
+      });
+    }
+  });
+}
+
+function completeSlot(slotId, slot, source, key) {
+  key = key || todayKey();
+  const dLog = state.dailyLogs[key] || { proteinG:0, steps:0, weightKg:null, workoutIds: [] };
+  dLog.workoutIds = dLog.workoutIds || [];
+  dLog.workoutIds.push(slotId);
+  state.dailyLogs[key] = dLog;
+
+  addXp(slot.xp || {});
+
+  state.workouts.push({
+    id: slotId, date: key, type: slot.type, label: slot.label,
+    source: source || null, xp: slot.xp || {},
+  });
+
+  const wk = weekStartKey();
+  const wLog = state.weeklyLogs[wk] || { measurements: [], sessionsDone: 0 };
+  wLog.sessionsDone = (wLog.sessionsDone || 0) + 1;
+  state.weeklyLogs[wk] = wLog;
+
+  save();
+  toast(source === "fitstars" ? "Записано (FitStars) — опыт начислен" : "Записано — опыт начислен");
+  renderAll();
+}
+
+// ---------------------------------------------------------------------
+// RENDER: quests / history
+// ---------------------------------------------------------------------
+function renderChallenges() {
+  const wrap = document.getElementById("challenges");
+  wrap.innerHTML = "";
+  CHALLENGE_DEFS.forEach(c => {
+    const streak = computeChallengeStreak(c.check);
+    const meta = updateChallengeMeta(c.key, streak, c.target);
+    const pct = Math.min(100, Math.round((streak / c.target) * 100));
+    const achieved = streak >= c.target;
+    const timesLine = meta.timesCompleted > 0
+      ? `выполнено раз: ${meta.timesCompleted}${meta.lastCompletedDate ? " · последний: " + meta.lastCompletedDate : ""}`
+      : "ещё ни разу не выполнен целиком";
+    const box = document.createElement("div");
+    box.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:4px;">
+        <span style="font-family:'Archivo',sans-serif; font-weight:600; font-size:13.5px;">${c.title}</span>
+        ${achieved ? '<span class="pill good">пройден 🏆</span>' : `<span class="stat-val">${streak}/${c.target}</span>`}
+      </div>
+      <div class="stat-track"><div class="stat-fill ${achieved?'full':''}" style="width:${pct}%"></div></div>
+      <div class="empty" style="margin-top:4px;">${c.desc}</div>
+      <div class="empty" style="margin-top:2px;">${timesLine}</div>`;
+    wrap.appendChild(box);
+  });
+  save();
+}
+
+function renderQuests() {
+  renderChallenges();
+  const rank = getRank(state.character.rankKey);
+  const wk = weekStartKey();
+  const wLog = state.weeklyLogs[wk] || { sessionsDone: 0 };
+  const pct = Math.min(100, Math.round(((wLog.sessionsDone||0) / rank.sessionsPerWeek) * 100));
+  document.getElementById("weekProgress").innerHTML = `
+    <div class="stat-row" style="grid-template-columns: 1fr 3fr 60px;">
+      <span class="stat-name">Неделя</span>
+      <div class="stat-track"><div class="stat-fill" style="width:${pct}%"></div></div>
+      <span class="stat-val">${wLog.sessionsDone||0}/${rank.sessionsPerWeek}</span>
+    </div>`;
+
+  const hist = document.getElementById("dailyHistory");
+  hist.innerHTML = "";
+  const days = [];
+  for (let i=0;i<14;i++) { const d = new Date(); d.setDate(d.getDate()-i); days.push(d); }
+  let any = false;
+  days.forEach(d => {
+    const k = todayKey(d);
+    const log = state.dailyLogs[k];
+    if (!log) return;
+    any = true;
+    const row = document.createElement("div");
+    row.className = "history-row";
+    row.innerHTML = `<span class="d">${k}</span><span>белок ${log.proteinG||0}г · шаги ${log.steps||0} · вес ${log.weightKg||"—"}кг · трен. ${(log.workoutIds||[]).length}</span>`;
+    hist.appendChild(row);
+  });
+  if (!any) hist.innerHTML = `<p class="empty">Пока нет записей — заполни дашборд сегодня.</p>`;
+
+  renderMeasurements();
+}
+
+document.getElementById("btnSaveMeas").addEventListener("click", () => {
+  state.measurements.push({
+    date: todayKey(),
+    waist: Number(document.getElementById("mWaist").value) || null,
+    hips: Number(document.getElementById("mHips").value) || null,
+    chest: Number(document.getElementById("mChest").value) || null,
+    arm: Number(document.getElementById("mArm").value) || null,
+  });
+  save();
+  toast("Замеры сохранены");
+  renderMeasurements();
+});
+
+function renderMeasurements() {
+  const el = document.getElementById("measHistory");
+  if (!state.measurements.length) { el.innerHTML = `<p class="empty">Замеров ещё нет.</p>`; return; }
+  el.innerHTML = state.measurements.slice().reverse().slice(0,8).map(m => `
+    <div class="history-row"><span class="d">${m.date}</span>
+    <span>талия ${m.waist??"—"} · бёдра ${m.hips??"—"} · грудь ${m.chest??"—"} · бицепс ${m.arm??"—"}</span></div>
+  `).join("");
+}
+
+// ---------------------------------------------------------------------
+// RENDER: boss
+// ---------------------------------------------------------------------
+function renderBoss() {
+  const rank = getRank(state.character.rankKey);
+  const nr = nextRank(rank.key);
+  const fieldsWrap = document.getElementById("bossFields");
+  const resultWrap = document.getElementById("bossResult");
+  resultWrap.innerHTML = "";
+
+  if (!nr) {
+    document.getElementById("bossTitle").textContent = "Все боссы пройдены";
+    document.getElementById("bossSubtitle").textContent = "Ранг Sarah Connor достигнут — держим форму, тест можно повторять как проверку удержания.";
+  } else {
+    const def = BOSS_DEFS[nr.key];
+    document.getElementById("bossTitle").textContent = def.title;
+    document.getElementById("bossSubtitle").textContent = `Прохождение открывает ранг «${nr.name}»`;
+  }
+
+  const targetKey = nr ? nr.key : "connor";
+  const def = BOSS_DEFS[targetKey];
+  fieldsWrap.innerHTML = "";
+  def.fields.forEach(f => {
+    const row = document.createElement("div");
+    row.className = "field";
+    if (f.cmp === "bool") {
+      row.innerHTML = `<span class="flabel">${f.label}</span><span class="fthresh"><input type="checkbox" id="bf-${f.key}"></span>`;
+    } else {
+      row.innerHTML = `<span class="flabel">${f.label}</span><span class="fthresh">цель ${f.cmp==='lte'?'≤':'≥'} ${f.th} <input type="number" id="bf-${f.key}" step="0.1"></span>`;
+    }
+    fieldsWrap.appendChild(row);
+  });
+
+  document.getElementById("btnRunBoss").onclick = () => runBoss(targetKey, !!nr);
+
+  const histWrap = document.getElementById("bossHistory");
+  if (!state.bossTests.length) { histWrap.innerHTML = `<p class="empty">Тестов ещё не было.</p>`; }
+  else {
+    histWrap.innerHTML = state.bossTests.slice().reverse().map(t => `
+      <div class="history-row"><span class="d">${t.date} · ${BOSS_DEFS[t.targetRankKey].title}</span>
+      <span class="pill ${t.passed ? 'good' : 'warn'}">${t.passed ? 'пройден' : 'не пройден'}</span></div>
+    `).join("");
+  }
+}
+
+function runBoss(targetKey, isRealNext) {
+  const def = BOSS_DEFS[targetKey];
+  const values = {}; const failed = [];
+  def.fields.forEach(f => {
+    const el = document.getElementById(`bf-${f.key}`);
+    let v;
+    if (f.cmp === "bool") { v = el.checked ? 1 : 0; }
+    else { v = Number(el.value) || 0; }
+    values[f.key] = v;
+    const pass = f.cmp === "bool" ? v === 1 : (f.cmp === "gte" ? v >= f.th : v <= f.th);
+    if (!pass) failed.push(f.label);
+  });
+  const passed = failed.length === 0;
+
+  state.bossTests.push({ id: `boss-${Date.now()}`, targetRankKey: targetKey, date: todayKey(), values, passed, failedFields: failed });
+
+  if (passed && isRealNext) {
+    state.character.rankKey = targetKey;
+    toast(`Босс пройден! Новый ранг: ${getRank(targetKey).name}`);
+  } else if (passed) {
+    toast("Тест пройден — форма держится.");
+  }
+  save();
+
+  const resultWrap = document.getElementById("bossResult");
+  if (passed) {
+    resultWrap.innerHTML = `<span class="pill good">Пройден</span> — все показатели на уровне порога или выше.`;
+  } else {
+    resultWrap.innerHTML = `<span class="pill warn">Не пройден</span> — слабые места: ${failed.join(", ")}. Это не откат назад — просто следующий цикл тренировок стоит сместить в их сторону, и попробовать снова.`;
+  }
+  renderAll();
+}
+
+// ---------------------------------------------------------------------
+// RENDER: character
+// ---------------------------------------------------------------------
+function renderCharacter() {
+  const el = document.getElementById("ladder");
+  el.innerHTML = "";
+  const curIdx = rankIndex(state.character.rankKey);
+  RANKS.forEach((r, i) => {
+    const row = document.createElement("div");
+    row.className = "rank-row" + (i === curIdx ? " current" : "") + (i < curIdx ? " cleared" : "");
+    row.innerHTML = `<span class="n">${i+1}</span><span class="t">${r.name}</span><span class="req">${r.sessionsPerWeek} трен/нед · XP ${r.xpFloor}+</span>`;
+    el.appendChild(row);
+  });
+  renderStatBars(document.getElementById("statBars2"));
+  snapshotStats();
+  save();
+  renderStatHistory();
+
+  const sdInput = document.getElementById("startDateInput");
+  const sdNote = document.getElementById("startDateNote");
+  if (state.settings.startDate) {
+    sdInput.value = state.settings.startDate;
+    const todayStr = todayKey();
+    if (todayStr < state.settings.startDate) {
+      const diffDays = Math.round((new Date(state.settings.startDate) - new Date(todayStr)) / 86400000);
+      sdNote.textContent = `До старта ${diffDays} дн. Баннер с обратным отсчётом будет виден на вкладке «Сегодня».`;
+    } else {
+      sdNote.textContent = "Программа уже идёт.";
+    }
+  } else {
+    if (!sdInput.value) sdInput.value = "2026-08-31";
+    sdNote.textContent = "Дата ещё не сохранена — подставлен ближайший понедельник как подсказка, поменяй при необходимости и нажми «Сохранить».";
+  }
+}
+
+function renderStatHistory() {
+  const wrap = document.getElementById("statHistory");
+  wrap.innerHTML = "";
+  STATS.forEach(k => {
+    const series = weeklySeries(k, 10);
+    const delta = series[series.length - 1] - series[0];
+    const sign = delta > 0 ? "+" : "";
+    const row = document.createElement("div");
+    row.className = "stat-row";
+    row.style.gridTemplateColumns = "70px 1fr 92px";
+    row.innerHTML = `<span class="stat-name">${STAT_LABELS[k]}</span><canvas width="160" height="26" id="spark-${k}"></canvas><span class="stat-val">${sign}${delta} / 10 нед</span>`;
+    wrap.appendChild(row);
+  });
+  STATS.forEach(k => drawSparkline(document.getElementById(`spark-${k}`), weeklySeries(k, 10), 100));
+}
+
+document.getElementById("btnSaveStartDate").addEventListener("click", () => {
+  const v = document.getElementById("startDateInput").value;
+  state.settings.startDate = v || null;
+  save();
+  toast(v ? `Дата старта сохранена: ${v}` : "Дата старта очищена");
+  renderAll();
+});
+
+document.getElementById("btnReset").addEventListener("click", () => {
+  if (!confirm("Точно сбросить весь прогресс?")) return;
+  state = defaultState();
+  save();
+  renderAll();
+  toast("Прогресс сброшен");
+});
+
+// ---------------------------------------------------------------------
+// NAV
+// ---------------------------------------------------------------------
+document.querySelectorAll("nav.tabbar button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("nav.tabbar button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    document.getElementById(`view-${btn.dataset.view}`).classList.add("active");
+  });
+});
+
+function renderAll() {
+  renderDashboard();
+  renderToday();
+  renderQuests();
+  renderBoss();
+  renderCharacter();
+}
+renderAll();
+
+// ---------------------------------------------------------------------
+// PWA: manifest уже подключен выше; сервис-воркер регистрируем мягко —
+// если файл недоступен (например, предпросмотр в один файл), просто молчим.
+// ---------------------------------------------------------------------
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
