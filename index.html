@@ -562,7 +562,18 @@ function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
 }
 
-function todayKey(d = new Date()) { return d.toISOString().slice(0,10); }
+// ВАЖНО: намеренно НЕ используем d.toISOString() — он возвращает дату в UTC,
+// а не в локальном времени телефона. Для часовых поясов восточнее UTC (например,
+// UTC+5) это систематически сдвигает дату локальной полуночи на день назад
+// (полночь субботы по местному времени — это ещё вечер пятницы по UTC), из-за
+// чего календарь путал текущий день с соседним. Собираем ключ строго из
+// локальных year/month/date, без какой-либо конвертации часового пояса.
+function todayKey(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 function weekStartKey(d = new Date()) {
   const day = d.getDay(); // 0=Sun
   const diff = (day === 0 ? 6 : day - 1); // days since Monday
@@ -1168,12 +1179,21 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) rend
 window.addEventListener("focus", renderAll);
 
 // ---------------------------------------------------------------------
-// PWA: manifest уже подключен выше; сервис-воркер регистрируем мягко —
-// если файл недоступен (например, предпросмотр в один файл), просто молчим.
+// PWA: manifest уже подключен выше. На каждой загрузке сначала убираем
+// ЛЮБОЙ уже установленный на устройстве сервис-воркер (мог зависнуть в
+// старой версии с агрессивным кэшем) и ставим свежий заново с
+// updateViaCache:"none" — это запрещает браузеру когда-либо отдавать
+// сам файл sw.js из HTTP-кэша, только с сервера. Немного лишней сетевой
+// работы при каждом открытии, зато обновления гарантированно долетают.
 // ---------------------------------------------------------------------
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
+    navigator.serviceWorker.getRegistrations()
+      .then((regs) => Promise.all(regs.map((r) => r.unregister())))
+      .catch(() => {})
+      .finally(() => {
+        navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(() => {});
+      });
   });
 }
 </script>
