@@ -104,12 +104,17 @@
   }
   .check.done { background: var(--good); border-color: var(--good); color: #fff; }
 
-  /* week strip (calendar) */
-  .weekstrip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  /* week strip (calendar) — горизонтальная прокрутка, чтобы никогда не ломать раскладку
+     на узких экранах или при увеличенном системном шрифте */
+  .weekstrip {
+    display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+  }
   .daycard {
     border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface);
     padding: 8px 6px; min-height: 92px; display: flex; flex-direction: column; gap: 5px;
     cursor: pointer; text-align: center;
+    flex: 0 0 auto; width: 68px; scroll-snap-align: start;
   }
   .daycard .dow { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
   .daycard .num { font-family: "Archivo", sans-serif; font-weight: 600; font-size: 14px; }
@@ -528,6 +533,7 @@ function defaultState() {
     statHistory: [],      // {date, stats:{...}} — один снимок в день, для графика по неделям
     challengeMeta: {},    // key -> {prevStreak, timesCompleted, lastCompletedDate}
     settings: { startDate: null }, // дата старта программы, YYYY-MM-DD
+    meta: { installedAt: todayKey() }, // дата первого запуска — челленджи не считают дни до неё
   };
 }
 let state = load();
@@ -562,7 +568,9 @@ function planForDate(d) {
 function computeChallengeStreak(check) {
   let streak = 0;
   const d = new Date();
+  const floor = state.meta.installedAt; // не считаем дни до первого запуска приложения
   while (streak < 400) {
+    if (todayKey(d) < floor) break;
     if (check(d)) { streak++; d.setDate(d.getDate() - 1); } else break;
   }
   return streak;
