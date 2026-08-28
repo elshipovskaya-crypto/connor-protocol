@@ -43,7 +43,14 @@
     background: var(--bg); color: var(--ink);
     font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
     font-size: 15.5px; line-height: 1.55; -webkit-font-smoothing: antialiased;
-    padding-bottom: 76px;
+    /* Нижняя панель вкладок — fixed, поэтому реального места под контент
+       она не занимает; без этого отступа последняя кнопка на вкладке
+       («Сохранить», «Сбросить весь прогресс» и т.п.) уезжает под неё.
+       env(safe-area-inset-bottom) отдельно учитывает домашний индикатор
+       iPhone — панель и так на него отступает (см. nav.tabbar), но сам
+       body должен отступать на ту же величину, иначе на face-id моделях
+       не хватает как раз этого кусочка. */
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
   }
   .mono { font-family: "IBM Plex Mono", monospace; }
   h1, h2, h3 { font-family: "Archivo", sans-serif; font-weight: 600; margin: 0; }
