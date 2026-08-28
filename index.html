@@ -107,6 +107,15 @@
   }
   .check.done { background: var(--good); border-color: var(--good); color: #fff; }
 
+  /* фигура персонажа — «сосуд», наполняющийся по мере роста статов */
+  .figure-wrap { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+  .figure-svg { width: 128px; height: auto; flex-shrink: 0; }
+  #figureFill, #figureWaterline { transition: y .6s ease, height .6s ease; }
+  .figure-info { display: flex; flex-direction: column; gap: 6px; min-width: 160px; }
+  .figure-pct { font-family: "IBM Plex Mono", monospace; font-size: 2rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .figure-rank { font-family: "Archivo", sans-serif; font-weight: 600; font-size: 14px; color: var(--accent); }
+  .figure-weak { font-size: 12.5px; color: var(--muted); }
+
   /* week strip (calendar) — горизонтальная прокрутка, чтобы никогда не ломать раскладку
      на узких экранах или при увеличенном системном шрифте */
   .weekstrip {
@@ -326,6 +335,40 @@
 
   <!-- ============ CHARACTER ============ -->
   <section class="view" id="view-char">
+    <div class="card">
+      <p class="card-label">Прогресс персонажа</p>
+      <div class="figure-wrap">
+        <svg class="figure-svg" viewBox="0 0 160 340" aria-hidden="true">
+          <defs>
+            <clipPath id="bodyClip">
+              <circle cx="80" cy="32" r="24"/>
+              <rect x="52" y="58" width="56" height="110" rx="20"/>
+              <rect x="24" y="62" width="20" height="120" rx="10"/>
+              <rect x="116" y="62" width="20" height="120" rx="10"/>
+              <rect x="54" y="168" width="24" height="150" rx="12"/>
+              <rect x="82" y="168" width="24" height="150" rx="12"/>
+            </clipPath>
+          </defs>
+          <g fill="none" stroke="var(--line)" stroke-width="2.5">
+            <circle cx="80" cy="32" r="24"/>
+            <rect x="52" y="58" width="56" height="110" rx="20"/>
+            <rect x="24" y="62" width="20" height="120" rx="10"/>
+            <rect x="116" y="62" width="20" height="120" rx="10"/>
+            <rect x="54" y="168" width="24" height="150" rx="12"/>
+            <rect x="82" y="168" width="24" height="150" rx="12"/>
+          </g>
+          <g clip-path="url(#bodyClip)">
+            <rect id="figureFill" x="0" y="340" width="160" height="0" fill="var(--accent)"></rect>
+            <line id="figureWaterline" x1="0" x2="160" y1="340" y2="340" stroke="var(--surface)" stroke-width="2" opacity="0.7"/>
+          </g>
+        </svg>
+        <div class="figure-info">
+          <span class="figure-pct" id="figurePct">0%</span>
+          <span class="figure-rank" id="figureRankName">Цивильная</span>
+          <span class="figure-weak" id="figureWeak"></span>
+        </div>
+      </div>
+    </div>
     <div class="card">
       <p class="card-label">Лестница рангов</p>
       <div class="ladder" id="ladder"></div>
@@ -1090,7 +1133,32 @@ function runBoss(targetKey, isRealNext) {
 // ---------------------------------------------------------------------
 // RENDER: character
 // ---------------------------------------------------------------------
+function renderCharacterFigure() {
+  const totalH = 340;
+  const values = STATS.map(k => state.character.stats[k] || 0);
+  const avgPct = values.reduce((a, b) => a + b, 0) / STATS.length;
+  const pct = Math.max(0, Math.min(100, avgPct));
+  const fillH = (pct / 100) * totalH;
+  const fillY = totalH - fillH;
+
+  const rect = document.getElementById("figureFill");
+  const waterline = document.getElementById("figureWaterline");
+  if (rect) { rect.setAttribute("height", fillH.toFixed(1)); rect.setAttribute("y", fillY.toFixed(1)); }
+  if (waterline) { waterline.setAttribute("y1", fillY.toFixed(1)); waterline.setAttribute("y2", fillY.toFixed(1)); }
+
+  document.getElementById("figurePct").textContent = `${Math.round(pct)}%`;
+  document.getElementById("figureRankName").textContent = getRank(state.character.rankKey).name;
+
+  let weakestKey = STATS[0], weakestVal = values[0];
+  STATS.forEach((k, i) => { if (values[i] < weakestVal) { weakestVal = values[i]; weakestKey = k; } });
+  const weakEl = document.getElementById("figureWeak");
+  weakEl.textContent = avgPct > 0
+    ? `Слабее всего сейчас: ${STAT_LABELS[weakestKey]}`
+    : "Пока всё на нуле — это нормально, старт есть старт.";
+}
+
 function renderCharacter() {
+  renderCharacterFigure();
   const el = document.getElementById("ladder");
   el.innerHTML = "";
   const curIdx = rankIndex(state.character.rankKey);
