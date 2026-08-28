@@ -43,14 +43,6 @@
     background: var(--bg); color: var(--ink);
     font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
     font-size: 15.5px; line-height: 1.55; -webkit-font-smoothing: antialiased;
-    /* Нижняя панель вкладок — fixed, поэтому реального места под контент
-       она не занимает; без этого отступа последняя кнопка на вкладке
-       («Сохранить», «Сбросить весь прогресс» и т.п.) уезжает под неё.
-       env(safe-area-inset-bottom) отдельно учитывает домашний индикатор
-       iPhone — панель и так на него отступает (см. nav.tabbar), но сам
-       body должен отступать на ту же величину, иначе на face-id моделях
-       не хватает как раз этого кусочка. */
-    padding-bottom: calc(96px + env(safe-area-inset-bottom));
   }
   .mono { font-family: "IBM Plex Mono", monospace; }
   h1, h2, h3 { font-family: "Archivo", sans-serif; font-weight: 600; margin: 0; }
@@ -72,7 +64,20 @@
     padding: 3px 9px; border-radius: 3px; white-space: nowrap;
   }
 
-  main { max-width: 640px; margin: 0 auto; padding: 18px 16px 8px; }
+  main {
+    max-width: 640px; margin: 0 auto; padding: 18px 16px 8px;
+    /* Нижняя панель вкладок — fixed, поэтому реального места под контент
+       она не занимает; без этого отступа последняя кнопка на вкладке
+       («Сохранить», «Сбросить весь прогресс» и т.п.) уезжает под неё.
+       Отступ повешен именно на <main>, а не на <body>: у body стоит
+       height:100%, и если контент внутри и так выше этой высоты,
+       собственный padding-bottom у body визуально «схлопывается» —
+       не добавляет реального места для прокрутки. У main такого
+       ограничения нет, поэтому отступ здесь действительно работает.
+       env(safe-area-inset-bottom) добавляет место под домашний индикатор
+       iPhone (nav и так отступает на него снизу — см. nav.tabbar). */
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
   .view { display: none; flex-direction: column; gap: 18px; }
   .view.active { display: flex; }
 
@@ -309,7 +314,7 @@
 
 <header class="top">
   <span class="brand">Протокол Коннор</span>
-  <span class="rank mono" id="hdrRank">Цивильная</span>
+  <span class="rank mono" id="hdrRank">Новичок</span>
 </header>
 
 <main>
@@ -488,7 +493,7 @@
         </svg>
         <div class="figure-info">
           <span class="figure-pct" id="figurePct">0%</span>
-          <span class="figure-rank" id="figureRankName">Цивильная</span>
+          <span class="figure-rank" id="figureRankName">Новичок</span>
           <span class="figure-weak" id="figureWeak"></span>
         </div>
       </div>
@@ -627,7 +632,7 @@ function pickFlavorTip() {
 
 // -------- Ранги: имя, порог опыта для перехода, тренировок/нед, ключ недельного плана
 const RANKS = [
-  { key:"civilian",   name:"Цивильная",           xpFloor:0,    sessionsPerWeek:5, weekPlan:"start" },
+  { key:"civilian",   name:"Новичок",             xpFloor:0,    sessionsPerWeek:5, weekPlan:"start" },
   { key:"recruit",    name:"Новобранец",          xpFloor:120,  sessionsPerWeek:6, weekPlan:"grow"  },
   { key:"trainee",    name:"Стажёр",               xpFloor:320,  sessionsPerWeek:7, weekPlan:"build" },
   { key:"resistance", name:"Боец Сопротивления",   xpFloor:600,  sessionsPerWeek:8, weekPlan:"full"  },
@@ -642,7 +647,7 @@ const RANKS = [
 // только область фокуса; что именно делать в рамках фокуса, решает сама
 // пользовательница (свои упражнения, YouTube, FitStars и т.д.).
 const WEEK_PLANS = {
-  start: { // Цивильная: 2 силовых + 2 табаты + 1 аштанга = 5
+  start: { // Новичок: 2 силовых + 2 табаты + 1 аштанга = 5
     1: [{type:"tabata", label:"Табата (4 раунда)", focus:"Всё тело — кондиционка", xp:{END:6}}],
     2: [{type:"ashtanga", label:"Аштанга — база", focus:"Растяжка, дыхание, контроль", xp:{FLEX:6}}],
     3: [{type:"strength", label:"Силовая A (лёгкая)", focus:"Всё тело", xp:{STR:6}, allowFitstars:true}],
