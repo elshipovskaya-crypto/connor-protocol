@@ -533,7 +533,7 @@ function defaultState() {
     statHistory: [],      // {date, stats:{...}} — один снимок в день, для графика по неделям
     challengeMeta: {},    // key -> {prevStreak, timesCompleted, lastCompletedDate}
     settings: { startDate: null }, // дата старта программы, YYYY-MM-DD
-    meta: { installedAt: todayKey() }, // дата первого запуска — челленджи не считают дни до неё
+    meta: { firstActivityDate: null }, // дата ПЕРВОГО реального лога (не запуска!) — до неё челленджи = 0
   };
 }
 let state = load();
@@ -565,10 +565,15 @@ function planForDate(d) {
   const rank = getRank(state.character.rankKey);
   return WEEK_PLANS[rank.weekPlan][d.getDay()] || [];
 }
+function markActivity() {
+  if (!state.meta.firstActivityDate) state.meta.firstActivityDate = todayKey();
+}
+
 function computeChallengeStreak(check) {
+  const floor = state.meta.firstActivityDate;
+  if (!floor) return 0; // ничего ещё ни разу не залогировано — честный ноль
   let streak = 0;
   const d = new Date();
-  const floor = state.meta.installedAt; // не считаем дни до первого запуска приложения
   while (streak < 400) {
     if (todayKey(d) < floor) break;
     if (check(d)) { streak++; d.setDate(d.getDate() - 1); } else break;
@@ -730,6 +735,7 @@ document.getElementById("btnSaveDaily").addEventListener("click", () => {
   if (state.dailyLogs[key].steps >= 8000) disc += 2;
   if (state.dailyLogs[key].weightKg) disc += 2;
   addXp({ DISC: disc });
+  markActivity();
   save();
   renderAll();
   document.getElementById("dailySavedNote").textContent = "сохранено ✓";
@@ -883,6 +889,7 @@ function completeSlot(slotId, slot, source, key) {
   wLog.sessionsDone = (wLog.sessionsDone || 0) + 1;
   state.weeklyLogs[wk] = wLog;
 
+  markActivity();
   save();
   toast(source === "fitstars" ? "Записано (FitStars) — опыт начислен" : "Записано — опыт начислен");
   renderAll();

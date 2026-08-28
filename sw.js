@@ -2,7 +2,7 @@
 // Все данные персонажа хранятся в localStorage на устройстве — сервис-воркер
 // отвечает только за то, чтобы сама оболочка приложения открывалась без сети.
 
-const CACHE_NAME = "connor-protocol-v2";
+const CACHE_NAME = "connor-protocol-v3";
 const ASSETS = [
   "./",
   "./index.html",
