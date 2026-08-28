@@ -19,6 +19,8 @@
     --accent: #3d4d52; --accent-soft: #e4e9ea;
     --warn: #a8402b; --warn-soft: #f3e2dd;
     --good: #4c6b4f; --good-soft: #e4ecdf;
+    --on-bright: #fff; /* цвет текста поверх заливки var(--accent)/var(--good) — обычно белый,
+                           но на ярких неоновых фонах (тема «ретро-терминал») он не читается */
     --radius: 3px;
   }
   @media (prefers-color-scheme: dark) {
@@ -36,6 +38,31 @@
     --accent: #8fa8ad; --accent-soft: #2a3436;
     --warn: #d97a5f; --warn-soft: #3a2620;
     --good: #93b48f; --good-soft: #263127;
+  }
+  /* Ретро-терминал — отдельная тема «для настроения», переключается вручную
+     кнопкой на вкладке «Персонаж» и не зависит от системной светлой/тёмной
+     темы (data-theme) — оба атрибута независимы, но эта тема, если включена,
+     полностью перекрывает палитру. */
+  :root[data-scheme="terminal"] {
+    --bg: #030b06; --surface: #081a10; --surface-2: #0e2818;
+    --ink: #6dffa0; --ink-soft: #4fdc85; --muted: #2f7a52; --line: #17402a;
+    --accent: #39ff6a; --accent-soft: #0f2e1c;
+    --warn: #ff6b4d; --warn-soft: #331812;
+    --good: #39ff6a; --good-soft: #0f2e1c;
+    /* Белый текст на ярком неоновом зелёном (--accent/--good) почти не читается —
+       здесь вместо него берём тёмный, почти чёрный зелёный. */
+    --on-bright: #04140a;
+  }
+  :root[data-scheme="terminal"] body {
+    font-family: "IBM Plex Mono", monospace;
+    text-shadow: 0 0 1px rgba(109, 255, 160, 0.35);
+  }
+  :root[data-scheme="terminal"] body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 15;
+    background: repeating-linear-gradient(
+      to bottom, rgba(0,0,0,0.16) 0px, rgba(0,0,0,0.16) 1px, transparent 1px, transparent 3px
+    );
+    mix-blend-mode: multiply; opacity: 0.55;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
@@ -117,7 +144,7 @@
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     font-size: 13px; color: transparent; cursor: pointer; background: var(--surface);
   }
-  .check.done { background: var(--good); border-color: var(--good); color: #fff; }
+  .check.done { background: var(--good); border-color: var(--good); color: var(--on-bright); }
 
   /* фигура персонажа — «сосуд», наполняющийся по мере роста статов */
   .figure-wrap { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
@@ -179,7 +206,7 @@
   button.btn {
     font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: 0.03em;
     padding: 8px 14px; border-radius: 3px; border: 1px solid var(--accent);
-    background: var(--accent); color: #fff; cursor: pointer;
+    background: var(--accent); color: var(--on-bright); cursor: pointer;
   }
   button.btn.secondary { background: transparent; color: var(--accent); }
   button.btn.done { background: var(--good); border-color: var(--good); }
@@ -345,6 +372,20 @@
     <div class="card" id="flavorCard">
       <p class="card-label">Диагностика</p>
       <p id="flavorText" style="margin:0; font-size:14px; color:var(--ink); font-style:italic;"></p>
+    </div>
+
+    <div class="card" id="weakLinkCard">
+      <p class="card-label">Слабое звено — быстрое действие</p>
+      <p style="margin:0 0 8px; font-size:14px;">Сейчас просаживает: <b id="weakLinkStat">—</b></p>
+      <p style="margin:0; font-size:13.5px; color:var(--ink);" id="weakLinkDrill"></p>
+      <div class="row-btns" style="margin-top:10px;">
+        <button class="btn" id="btnWeakLink">Сделал(а) — отметить</button>
+      </div>
+    </div>
+
+    <div class="card" id="etaCard">
+      <p class="card-label">Прогноз: финальный ранг</p>
+      <p class="empty" id="etaText" style="font-style:normal;"></p>
     </div>
 
     <div class="card">
@@ -521,6 +562,13 @@
         <button class="btn" id="btnSaveStartDate">Сохранить</button>
       </div>
       <p class="empty" id="startDateNote" style="margin-top:8px;"></p>
+    </div>
+    <div class="card">
+      <p class="card-label">Оформление</p>
+      <div class="row-btns">
+        <button class="btn" id="btnToggleTheme">Тема: обычная</button>
+      </div>
+      <p class="empty" style="margin-top:8px;">Ретро-терминал — альтернативная зелёная монохромная тема со сканлайнами, чисто для настроения. Работает независимо от системной светлой/тёмной темы.</p>
     </div>
     <div class="card">
       <p class="card-label">Статы</p>
@@ -801,7 +849,7 @@ function defaultState() {
     measurements: [],     // {date, waist, hips, chest, arm}
     statHistory: [],      // {date, stats:{...}} — один снимок в день, для графика по неделям
     challengeMeta: {},    // key -> {prevStreak, timesCompleted, lastCompletedDate}
-    settings: { startDate: null }, // дата старта программы, YYYY-MM-DD
+    settings: { startDate: null, scheme: "default" }, // дата старта, scheme: "default"|"terminal"
     meta: { firstActivityDate: null }, // дата ПЕРВОГО реального лога (не запуска!) — до неё челленджи = 0
   };
 }
@@ -1034,7 +1082,137 @@ function renderDashboard() {
 
   // флейвор-подсказка по самому слабому стату
   document.getElementById("flavorText").textContent = pickFlavorTip();
+
+  renderWeakLinkCard();
+  renderEtaCard();
 }
+
+// -------- «Слабое звено»: мини-упражнение на самый слабый стат прямо сейчас,
+// отдельно от основного плана недели — чтобы закрывать явный пробел, не
+// дожидаясь следующего дня по расписанию. Одна отметка в день, небольшой XP.
+const MICRO_DRILLS = {
+  STR: [
+    "20 отжиманий в любом стиле, можно с колен, дробно по подходам",
+    "3×10 приседаний с паузой 2 сек внизу",
+    "Планка на локтях, 3×30 сек",
+  ],
+  END: [
+    "5 минут скакалка/бег на месте в среднем темпе",
+    "3×1 минута берпи в спокойном темпе",
+    "Табата, 4 раунда (20 сек работа / 10 сек отдых)",
+  ],
+  FLEX: [
+    "5 минут динамическая растяжка спины и бёдер",
+    "«Кошка-корова», 2 минуты медленно",
+    "Растяжка задней поверхности бедра, 2×30 сек на ногу",
+  ],
+  BAL: [
+    "Баланс на одной ноге, 3×20 сек на сторону",
+    "Ходьба по прямой линии, пятка к носку, 1 минута",
+    "Стойка «дерево», 3×30 сек на сторону",
+  ],
+  COORD: [
+    "Animal flow: медвежьи/крабовые переходы, 3 минуты",
+    "Прыжки со сменой ног (skater hops), 2 минуты",
+    "Жонглирование или упражнения на координацию рук, 3 минуты",
+  ],
+  DISC: [
+    "Заполни сегодняшние квесты прямо сейчас, не откладывая",
+    "Запиши вес и шаги за сегодня, даже если цифры не идеальные",
+    "Спланируй завтрашний приём белка заранее — что и когда",
+  ],
+};
+function pickMicroDrill(statKey) {
+  const list = MICRO_DRILLS[statKey];
+  const seed = (todayKey().replaceAll("-", "") + statKey + "wl").split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  return list[seed % list.length];
+}
+function renderWeakLinkCard() {
+  const statEl = document.getElementById("weakLinkStat");
+  const drillEl = document.getElementById("weakLinkDrill");
+  const btn = document.getElementById("btnWeakLink");
+  if (!statEl || !drillEl || !btn) return;
+  const weakest = getWeakestStat();
+  statEl.textContent = STAT_LABELS[weakest.key];
+  drillEl.textContent = pickMicroDrill(weakest.key);
+  const key = todayKey();
+  const log = state.dailyLogs[key];
+  const done = !!(log && log.weakLinkDone);
+  btn.disabled = done;
+  btn.textContent = done ? "Уже сделано сегодня ✓" : "Сделал(а) — отметить";
+}
+document.getElementById("btnWeakLink").addEventListener("click", () => {
+  const weakest = getWeakestStat();
+  const key = todayKey();
+  const existing = state.dailyLogs[key] || { proteinG: 0, steps: 0, weightKg: null, workoutIds: [] };
+  if (existing.weakLinkDone) return;
+  existing.weakLinkDone = true;
+  state.dailyLogs[key] = existing;
+  addXp({ [weakest.key]: 4 });
+  markActivity();
+  save();
+  renderAll();
+  toast(`Слабое звено закрыто — +4 к ${STAT_LABELS[weakest.key]}`);
+});
+
+// -------- Прогноз финального ранга: по среднему темпу набора XP с начала
+// реальной активности оцениваем дату, когда порога опыта для последнего
+// босса хватит на попытку. Это не гарантия ранга — сам переход всё ещё
+// требует пройденного теста, об этом отдельная строка в тексте.
+function daysBetweenKeys(a, b) {
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
+}
+function computeEtaFinalRank() {
+  const finalRank = RANKS[RANKS.length - 1];
+  const xp = state.character.xpTotal;
+  if (xp >= finalRank.xpFloor) return { status: "ready" };
+  const floor = state.meta.firstActivityDate;
+  if (!floor) return { status: "noData" };
+  const daysElapsed = Math.max(1, daysBetweenKeys(floor, todayKey()) + 1);
+  const avgPerDay = xp / daysElapsed;
+  if (avgPerDay <= 0) return { status: "noPace" };
+  const remaining = finalRank.xpFloor - xp;
+  const daysLeft = Math.ceil(remaining / avgPerDay);
+  const targetDate = new Date();
+  targetDate.setDate(targetDate.getDate() + daysLeft);
+  return { status: "ok", avgPerDay, daysLeft, targetDate };
+}
+function renderEtaCard() {
+  const el = document.getElementById("etaText");
+  if (!el) return;
+  if (state.character.rankKey === RANKS[RANKS.length - 1].key) {
+    el.textContent = "Ранг Sarah Connor уже достигнут — держим форму, дальше можно повторять Босса V как проверку.";
+    return;
+  }
+  const r = computeEtaFinalRank();
+  if (r.status === "noData") {
+    el.textContent = "Пока нет данных для прогноза — начни с любой тренировки или квеста.";
+  } else if (r.status === "ready") {
+    el.textContent = "Опыта уже достаточно для попытки финального босса — дело за самим тестом (вкладка «Босс»).";
+  } else if (r.status === "noPace") {
+    el.textContent = "Опыт пока не растёт — прогноз появится после первых тренировок.";
+  } else {
+    const dateStr = r.targetDate.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" }).replace(/\.$/, "");
+    el.textContent = `При текущем темпе (~${r.avgPerDay.toFixed(1)} XP/день) порога опыта для финального босса хватит примерно к ${dateStr}. Это не гарантия ранга — переход всё ещё даёт только пройденный тест.`;
+  }
+}
+
+// -------- Оформление: переключаемая тема «ретро-терминал», отдельно от
+// системной светлой/тёмной темы. Хранится в settings.scheme, применяется
+// атрибутом data-scheme на <html>.
+function applyScheme() {
+  const scheme = state.settings.scheme || "default";
+  document.documentElement.setAttribute("data-scheme", scheme);
+  const btn = document.getElementById("btnToggleTheme");
+  if (btn) btn.textContent = scheme === "terminal" ? "Тема: ретро-терминал (вкл.)" : "Тема: обычная";
+}
+document.getElementById("btnToggleTheme").addEventListener("click", () => {
+  state.settings.scheme = state.settings.scheme === "terminal" ? "default" : "terminal";
+  save();
+  applyScheme();
+});
 
 document.getElementById("btnSaveDaily").addEventListener("click", () => {
   const key = todayKey();
@@ -1611,6 +1789,7 @@ function renderAll() {
   renderBoss();
   renderCharacter();
 }
+applyScheme();
 renderAll();
 
 // Если приложение полежало свёрнутым (в фоне на телефоне) и была открыта не
