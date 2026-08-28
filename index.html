@@ -110,11 +110,17 @@
   /* фигура персонажа — «сосуд», наполняющийся по мере роста статов */
   .figure-wrap { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
   .figure-svg { width: 128px; height: auto; flex-shrink: 0; }
-  #figureFill, #figureWaterline { transition: y .6s ease, height .6s ease; }
+  .fig-fill, .fig-wl { transition: y .6s ease, height .6s ease; }
   .figure-info { display: flex; flex-direction: column; gap: 6px; min-width: 160px; }
   .figure-pct { font-family: "IBM Plex Mono", monospace; font-size: 2rem; font-weight: 600; font-variant-numeric: tabular-nums; }
   .figure-rank { font-family: "Archivo", sans-serif; font-weight: 600; font-size: 14px; color: var(--accent); }
   .figure-weak { font-size: 12.5px; color: var(--muted); }
+  .figure-legend {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px;
+    margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line);
+    font-size: 12px; color: var(--muted);
+  }
+  .figure-legend span b { color: var(--ink); font-weight: 600; }
 
   /* week strip (calendar) — горизонтальная прокрутка, чтобы никогда не ломать раскладку
      на узких экранах или при увеличенном системном шрифте */
@@ -219,6 +225,65 @@
   nav.tabbar button .ic { font-size: 17px; line-height: 1; }
   nav.tabbar button.active { color: var(--accent); }
 
+  /* ---------- Момент повышения ранга — намеренно вне обычной темы: это
+     системное HUD-сообщение, а не часть интерфейса, поэтому фон и цвета
+     заданы напрямую, а не через токены light/dark. ---------- */
+  .rankup-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: #0a0c0d;
+    display: none; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity .35s ease;
+    overflow: hidden;
+  }
+  .rankup-overlay.show { display: flex; opacity: 1; }
+  .rankup-scanline {
+    position: absolute; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, #8fe3d9, transparent);
+    box-shadow: 0 0 18px 2px rgba(143,227,217,0.7);
+    top: -5%;
+  }
+  .rankup-overlay.show .rankup-scanline { animation: rankup-sweep 1.6s ease-in-out 2; }
+  @keyframes rankup-sweep {
+    0% { top: -5%; opacity: 0; }
+    8% { opacity: 1; }
+    92% { opacity: 1; }
+    100% { top: 105%; opacity: 0; }
+  }
+  .rankup-content {
+    position: relative; text-align: center; padding: 32px;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .rankup-eyebrow {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: #6b7f7c; margin: 0;
+  }
+  .rankup-label {
+    font-family: "IBM Plex Mono", monospace; font-size: 13px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: #8fe3d9; margin: 6px 0 0;
+  }
+  .rankup-name {
+    font-family: "Archivo", sans-serif; font-weight: 700; font-size: clamp(1.8rem, 8vw, 2.6rem);
+    color: #f2fbfa; margin: 2px 0 18px; text-shadow: 0 0 22px rgba(143,227,217,0.55);
+    letter-spacing: 0.01em;
+  }
+  .rankup-overlay.show .rankup-name { animation: rankup-flicker 1.4s steps(1,end) 1; }
+  @keyframes rankup-flicker {
+    0%, 100% { opacity: 1; }
+    4% { opacity: 0.3; }
+    8% { opacity: 1; }
+    12% { opacity: 0.4; }
+    16% { opacity: 1; }
+  }
+  .rankup-dismiss {
+    font-family: "IBM Plex Mono", monospace; font-size: 12.5px; letter-spacing: 0.04em;
+    padding: 10px 22px; border-radius: 3px; border: 1px solid #3a4d4a;
+    background: transparent; color: #cfe9e5; cursor: pointer;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rankup-overlay.show .rankup-scanline,
+    .rankup-overlay.show .rankup-name { animation: none; }
+  }
+
   .toast {
     position: fixed; bottom: 88px; left: 50%; transform: translateX(-50%) translateY(10px);
     background: var(--ink); color: var(--bg); font-size: 13px; padding: 9px 16px;
@@ -251,8 +316,23 @@
     </div>
 
     <div class="card">
+      <p class="card-label">До следующего ранга</p>
+      <div class="stat-row" style="grid-template-columns: 1fr 3fr 90px;">
+        <span class="stat-name" id="xpNextName">—</span>
+        <div class="stat-track"><div class="stat-fill" id="xpNextFill" style="width:0%"></div></div>
+        <span class="stat-val" id="xpNextVal">0/0</span>
+      </div>
+      <p class="empty" id="xpNextNote" style="margin-top:6px;"></p>
+    </div>
+
+    <div class="card">
       <p class="card-label">Статы персонажа</p>
       <div id="statBars"></div>
+    </div>
+
+    <div class="card" id="flavorCard">
+      <p class="card-label">Диагностика</p>
+      <p id="flavorText" style="margin:0; font-size:14px; color:var(--ink); font-style:italic;"></p>
     </div>
 
     <div class="card">
@@ -348,6 +428,18 @@
               <rect x="54" y="168" width="24" height="150" rx="12"/>
               <rect x="82" y="168" width="24" height="150" rx="12"/>
             </clipPath>
+            <!-- Клип по зонам тела: каждая зона пересекается с bodyClip (вложенный
+                 clip-path), поэтому прямоугольник заливки можно рисовать во всю
+                 ширину — форма всё равно обрежется силуэтом. -->
+            <clipPath id="regionClip-head"><rect x="0" y="8" width="160" height="48"/></clipPath>
+            <clipPath id="regionClip-chest"><rect x="52" y="58" width="56" height="55"/></clipPath>
+            <clipPath id="regionClip-core"><rect x="52" y="113" width="56" height="55"/></clipPath>
+            <clipPath id="regionClip-arms">
+              <rect x="24" y="62" width="20" height="120"/>
+              <rect x="116" y="62" width="20" height="120"/>
+            </clipPath>
+            <clipPath id="regionClip-thighs"><rect x="54" y="168" width="52" height="75"/></clipPath>
+            <clipPath id="regionClip-calves"><rect x="54" y="243" width="52" height="75"/></clipPath>
           </defs>
           <g fill="none" stroke="var(--line)" stroke-width="2.5">
             <circle cx="80" cy="32" r="24"/>
@@ -356,10 +448,35 @@
             <rect x="116" y="62" width="20" height="120" rx="10"/>
             <rect x="54" y="168" width="24" height="150" rx="12"/>
             <rect x="82" y="168" width="24" height="150" rx="12"/>
+            <!-- тонкие пунктирные границы зон груди/корпуса и бёдер/голеней -->
+            <line x1="52" y1="113" x2="108" y2="113" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.5"/>
+            <line x1="54" y1="243" x2="106" y2="243" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.5"/>
           </g>
           <g clip-path="url(#bodyClip)">
-            <rect id="figureFill" x="0" y="340" width="160" height="0" fill="var(--accent)"></rect>
-            <line id="figureWaterline" x1="0" x2="160" y1="340" y2="340" stroke="var(--surface)" stroke-width="2" opacity="0.7"/>
+            <g clip-path="url(#regionClip-head)">
+              <rect id="fill-head" class="fig-fill" x="0" y="56" width="160" height="0" fill="var(--accent)"></rect>
+              <line id="wl-head" class="fig-wl" x1="0" x2="160" y1="56" y2="56" stroke="var(--surface)" stroke-width="2" opacity="0.7"/>
+            </g>
+            <g clip-path="url(#regionClip-chest)">
+              <rect id="fill-chest" class="fig-fill" x="0" y="113" width="160" height="0" fill="var(--accent)"></rect>
+              <line id="wl-chest" class="fig-wl" x1="0" x2="160" y1="113" y2="113" stroke="var(--surface)" stroke-width="2" opacity="0.7"/>
+            </g>
+            <g clip-path="url(#regionClip-core)">
+              <rect id="fill-core" class="fig-fill" x="0" y="168" width="160" height="0" fill="var(--accent)"></rect>
+              <line id="wl-core" class="fig-wl" x1="0" x2="160" y1="168" y2="168" stroke="var(--surface)" stroke-width="2" opacity="0.7"/>
+            </g>
+            <g clip-path="url(#regionClip-arms)">
+              <rect id="fill-arms" class="fig-fill" x="0" y="182" width="160" height="0" fill="var(--accent)"></rect>
+              <line id="wl-arms" class="fig-wl" x1="0" x2="160" y1="182" y2="182" stroke="var(--surface)" stroke-width="2" opacity="0.7"/>
+            </g>
+            <g clip-path="url(#regionClip-thighs)">
+              <rect id="fill-thighs" class="fig-fill" x="0" y="243" width="160" height="0" fill="var(--accent)"></rect>
+              <line id="wl-thighs" class="fig-wl" x1="0" x2="160" y1="243" y2="243" stroke="var(--surface)" stroke-width="2" opacity="0.7"/>
+            </g>
+            <g clip-path="url(#regionClip-calves)">
+              <rect id="fill-calves" class="fig-fill" x="0" y="318" width="160" height="0" fill="var(--accent)"></rect>
+              <line id="wl-calves" class="fig-wl" x1="0" x2="160" y1="318" y2="318" stroke="var(--surface)" stroke-width="2" opacity="0.7"/>
+            </g>
           </g>
         </svg>
         <div class="figure-info">
@@ -368,6 +485,18 @@
           <span class="figure-weak" id="figureWeak"></span>
         </div>
       </div>
+      <div class="figure-legend">
+        <span><b>Голова</b> — КООРД</span>
+        <span><b>Грудь</b> — ВЫН</span>
+        <span><b>Корпус</b> — ДИСЦ</span>
+        <span><b>Руки</b> — СИЛ</span>
+        <span><b>Бёдра</b> — БАЛ</span>
+        <span><b>Голени</b> — КОНТ</span>
+      </div>
+    </div>
+    <div class="card">
+      <p class="card-label">Личные рекорды</p>
+      <div id="prList"></div>
     </div>
     <div class="card">
       <p class="card-label">Лестница рангов</p>
@@ -391,6 +520,16 @@
       <p class="empty" style="margin-top:8px;">Точка — конец недели. График копится с этого обновления приложения, поэтому первое время точек будет мало — это нормально, дальше линия начнёт вытягиваться.</p>
     </div>
     <div class="card">
+      <p class="card-label">Резервная копия</p>
+      <p class="empty" style="margin-bottom:10px;">Весь прогресс хранится только в этом браузере на этом телефоне. Если почистить данные сайта, сменить телефон или браузер — прогресс пропадёт без возможности восстановить, если заранее не скачать копию.</p>
+      <div class="row-btns">
+        <button class="btn" id="btnExport">Скачать резервную копию</button>
+        <button class="btn secondary" id="btnImportTrigger">Восстановить из файла</button>
+        <input type="file" id="importFile" accept="application/json" style="display:none;">
+      </div>
+      <p class="empty" id="backupNote" style="margin-top:8px;"></p>
+    </div>
+    <div class="card">
       <p class="card-label">Сброс (для теста приложения)</p>
       <button class="btn secondary" id="btnReset">Сбросить весь прогресс</button>
     </div>
@@ -408,6 +547,16 @@
 
 <div class="toast" id="toast"></div>
 
+<div class="rankup-overlay" id="rankupOverlay" role="alert" aria-live="assertive">
+  <div class="rankup-scanline"></div>
+  <div class="rankup-content">
+    <p class="rankup-eyebrow">Диагностика формы завершена</p>
+    <p class="rankup-label">Новый ранг</p>
+    <h2 class="rankup-name" id="rankupName"></h2>
+    <button class="rankup-dismiss" id="rankupDismiss">Продолжить</button>
+  </div>
+</div>
+
 <script>
 /* ======================================================================
    ПРОТОКОЛ КОННОР — скелет приложения
@@ -418,6 +567,56 @@ const STORE_KEY = "connorProtocolState";
 
 const STATS = ["STR","END","FLEX","BAL","COORD","DISC"];
 const STAT_LABELS = { STR:"СИЛ", END:"ВЫН", FLEX:"КОНТ", BAL:"БАЛ", COORD:"КООРД", DISC:"ДИСЦ" };
+
+// -------- Флейвор-подсказки: строгий, но по делу голос — по самому слабому стату.
+// Одна и та же подсказка держится весь день (пересчитывается по дате, не при каждом рендере),
+// чтобы не мельтешить и не раздражать при каждом заходе в приложение.
+const FLAVOR_TIPS = {
+  STR: [
+    "Сопротивление не станет сильнее само. СИЛ — самый слабый узел. Следующая силовая — не по желанию.",
+    "Слабые руки не удержат то, что ты собираешься изменить. Ещё один подход.",
+    "СИЛ отстаёт от остальных. Система фиксирует это как приоритет, не как повод для вины.",
+  ],
+  END: [
+    "Дыхание сбивается раньше, чем должно. ВЫН просит табату, а не оправданий.",
+    "Функциональность начинается с того, сколько раундов ты выдерживаешь. Сейчас — недостаточно.",
+    "ВЫН — самое слабое звено на сегодня. Следующая кондиционка закроет разрыв быстрее остальных тренировок.",
+  ],
+  FLEX: [
+    "Тело без контроля — просто масса в движении. Коврик ждёт, КОНТ проседает.",
+    "Аштанга — не растяжка для галочки. КОНТ отстаёт от остальных статов заметнее всего.",
+    "Гибкость и дыхание — это тоже броня. Сейчас в этом месте её меньше всего.",
+  ],
+  BAL: [
+    "Пловец и сёрфер начинаются с равновесия, а не с силы. БАЛ — узкое место прямо сейчас.",
+    "Стойка на одной ноге кажется мелочью, пока не понадобится держать баланс под нагрузкой. Подтяни БАЛ.",
+    "Координация без баланса не считается. Это самый слабый стат на сегодня.",
+  ],
+  COORD: [
+    "Движение без координации — просто хаос. Animal flow не для галочки, а для КООРД.",
+    "КООРД проседает сильнее остальных. Связки движений закрывают это быстрее изолированных упражнений.",
+    "Ловкость — не бонус, а основа устойчивости. Сейчас именно её не хватает больше всего.",
+  ],
+  DISC: [
+    "Белок, шаги, взвешивание — это фундамент, а не мелочи. ДИСЦ ниже остальных статов.",
+    "Без стабильных привычек результат тренировок теряется наполовину. ДИСЦ — точка роста номер один сейчас.",
+    "Система не наказывает за пропуск — но и не считает его нейтральным. Закрой сегодняшние квесты.",
+  ],
+};
+function getWeakestStat() {
+  const values = STATS.map(k => state.character.stats[k] || 0);
+  let key = STATS[0], val = values[0];
+  STATS.forEach((k, i) => { if (values[i] < val) { val = values[i]; key = k; } });
+  return { key, val, avg: values.reduce((a,b)=>a+b,0) / STATS.length };
+}
+function pickFlavorTip() {
+  const { key, avg } = getWeakestStat();
+  if (avg === 0) return "Все статы на нуле. Диагностика бессмысленна, пока нет ни одной тренировки — начни с любой.";
+  const tips = FLAVOR_TIPS[key];
+  // Стабильный «случайный» индекс на весь день — от даты + ключа стата.
+  const seed = (todayKey().replaceAll("-", "") + key).split("").reduce((a,c) => a + c.charCodeAt(0), 0);
+  return tips[seed % tips.length];
+}
 
 // -------- Ранги: имя, порог опыта для перехода, тренировок/нед, ключ недельного плана
 const RANKS = [
@@ -650,6 +849,17 @@ function computeChallengeStreak(check) {
   return streak;
 }
 
+function showRankUpMoment(rankName) {
+  const overlay = document.getElementById("rankupOverlay");
+  document.getElementById("rankupName").textContent = rankName;
+  overlay.classList.add("show");
+  const hide = () => overlay.classList.remove("show");
+  overlay.onclick = hide;
+  document.getElementById("rankupDismiss").onclick = (e) => { e.stopPropagation(); hide(); };
+  clearTimeout(showRankUpMoment._t);
+  showRankUpMoment._t = setTimeout(hide, 4200);
+}
+
 function toast(msg) {
   const t = document.getElementById("toast");
   t.textContent = msg;
@@ -788,6 +998,30 @@ function renderDashboard() {
   document.getElementById("inProtein").value = dLog.proteinG ?? "";
   document.getElementById("inSteps").value = dLog.steps ?? "";
   document.getElementById("inWeight").value = dLog.weightKg ?? "";
+
+  // прогресс опыта до следующего ранга
+  const nr = nextRank(rank.key);
+  const fillEl = document.getElementById("xpNextFill");
+  const valEl = document.getElementById("xpNextVal");
+  const nameEl = document.getElementById("xpNextName");
+  const noteEl = document.getElementById("xpNextNote");
+  if (!nr) {
+    nameEl.textContent = "Sarah Connor";
+    fillEl.style.width = "100%";
+    valEl.textContent = "макс.";
+    noteEl.textContent = "Достигнут финальный ранг. Дальше — держать форму и периодически проверять себя Боссом V.";
+  } else {
+    const span = nr.xpFloor - rank.xpFloor;
+    const done = Math.max(0, state.character.xpTotal - rank.xpFloor);
+    const pct = span > 0 ? Math.min(100, (done / span) * 100) : 100;
+    nameEl.textContent = nr.name;
+    fillEl.style.width = `${pct}%`;
+    valEl.textContent = `${Math.min(done, span)}/${span} XP`;
+    noteEl.textContent = "Опыт открывает право на попытку — сам ранг даёт только пройденный босс-тест (вкладка «Босс»).";
+  }
+
+  // флейвор-подсказка по самому слабому стату
+  document.getElementById("flavorText").textContent = pickFlavorTip();
 }
 
 document.getElementById("btnSaveDaily").addEventListener("click", () => {
@@ -1115,7 +1349,7 @@ function runBoss(targetKey, isRealNext) {
 
   if (passed && isRealNext) {
     state.character.rankKey = targetKey;
-    toast(`Босс пройден! Новый ранг: ${getRank(targetKey).name}`);
+    showRankUpMoment(getRank(targetKey).name);
   } else if (passed) {
     toast("Тест пройден — форма держится.");
   }
@@ -1133,32 +1367,107 @@ function runBoss(targetKey, isRealNext) {
 // ---------------------------------------------------------------------
 // RENDER: character
 // ---------------------------------------------------------------------
+// Какая зона фигуры «наливается» от какого стата. Координаты — по высоте (y)
+// внутри соответствующей фигуры в SVG (см. regionClip-* в разметке): каждая
+// зона заполняется независимо снизу вверх, по проценту именно своего стата —
+// поэтому по фигуре видно не общий уровень, а какие части тела прокачаны,
+// а какие отстают.
+const REGION_MAP = [
+  { key: "head",   stat: "COORD", yTop: 8,   yBottom: 56  }, // Голова — КООРД
+  { key: "chest",  stat: "END",   yTop: 58,  yBottom: 113 }, // Грудь — ВЫН
+  { key: "core",   stat: "DISC",  yTop: 113, yBottom: 168 }, // Корпус — ДИСЦ
+  { key: "arms",   stat: "STR",   yTop: 62,  yBottom: 182 }, // Руки — СИЛ
+  { key: "thighs", stat: "BAL",   yTop: 168, yBottom: 243 }, // Бёдра — БАЛ
+  { key: "calves", stat: "FLEX",  yTop: 243, yBottom: 318 }, // Голени — КОНТ
+];
+
 function renderCharacterFigure() {
-  const totalH = 340;
   const values = STATS.map(k => state.character.stats[k] || 0);
   const avgPct = values.reduce((a, b) => a + b, 0) / STATS.length;
-  const pct = Math.max(0, Math.min(100, avgPct));
-  const fillH = (pct / 100) * totalH;
-  const fillY = totalH - fillH;
 
-  const rect = document.getElementById("figureFill");
-  const waterline = document.getElementById("figureWaterline");
-  if (rect) { rect.setAttribute("height", fillH.toFixed(1)); rect.setAttribute("y", fillY.toFixed(1)); }
-  if (waterline) { waterline.setAttribute("y1", fillY.toFixed(1)); waterline.setAttribute("y2", fillY.toFixed(1)); }
+  REGION_MAP.forEach(r => {
+    const raw = state.character.stats[r.stat] || 0;
+    const pct = Math.max(0, Math.min(100, raw));
+    const totalH = r.yBottom - r.yTop;
+    const fillH = (pct / 100) * totalH;
+    const fillY = r.yBottom - fillH;
+    const rect = document.getElementById(`fill-${r.key}`);
+    const wl = document.getElementById(`wl-${r.key}`);
+    if (rect) { rect.setAttribute("height", fillH.toFixed(1)); rect.setAttribute("y", fillY.toFixed(1)); }
+    if (wl) { wl.setAttribute("y1", fillY.toFixed(1)); wl.setAttribute("y2", fillY.toFixed(1)); }
+  });
 
-  document.getElementById("figurePct").textContent = `${Math.round(pct)}%`;
+  const pctTotal = Math.max(0, Math.min(100, avgPct));
+  document.getElementById("figurePct").textContent = `${Math.round(pctTotal)}%`;
   document.getElementById("figureRankName").textContent = getRank(state.character.rankKey).name;
 
-  let weakestKey = STATS[0], weakestVal = values[0];
-  STATS.forEach((k, i) => { if (values[i] < weakestVal) { weakestVal = values[i]; weakestKey = k; } });
+  const weakest = getWeakestStat();
   const weakEl = document.getElementById("figureWeak");
   weakEl.textContent = avgPct > 0
-    ? `Слабее всего сейчас: ${STAT_LABELS[weakestKey]}`
+    ? `Слабее всего сейчас: ${STAT_LABELS[weakest.key]}`
     : "Пока всё на нуле — это нормально, старт есть старт.";
+}
+
+// -------- Личные рекорды: лучшие показатели из истории боссов-фит-тестов.
+// Ключи полей общие для всех боссов (см. BOSS_DEFS), поэтому рекорд по
+// каждому ключу собирается по всей истории сразу, независимо от того, на
+// каком по счёту боссе он был показан.
+const PR_META = {
+  pushups:   { label: "Отжимания строгие",           unit: "повт.",          dir: "max"  },
+  row:       { label: "Тяга в наклоне/резинка",       unit: "повт.",          dir: "max"  },
+  pullups:   { label: "Подтягивания строгие",         unit: "повт.",          dir: "max"  },
+  tabata:    { label: "Табата",                       unit: "раундов",        dir: "max"  },
+  balance:   { label: "Баланс на одной ноге",         unit: "сек",            dir: "max"  },
+  plank:     { label: "Планка",                       unit: "сек",            dir: "max"  },
+  rollout:   { label: "Роллаут на ролике",            unit: "повт.",          dir: "max"  },
+  popup:     { label: "Поп-ап",                       unit: "сек",            dir: "min"  },
+  pistol:    { label: "Пистолетик",                   unit: "повт./нога",     dir: "max"  },
+  handstand: { label: "Стойка на руках у стены",      unit: "сек",            dir: "max"  },
+  flow:      { label: "Animal flow",                  unit: "чистых переходов", dir: "max" },
+  disc:      { label: "Выполнение квестов",           unit: "%",              dir: "max"  },
+  ashtanga:  { label: "Аштанга-серия целиком",        unit: "",               dir: "bool" },
+};
+
+function computePersonalRecords() {
+  const best = {};
+  state.bossTests.forEach(t => {
+    Object.entries(t.values || {}).forEach(([k, v]) => {
+      const meta = PR_META[k];
+      if (!meta) return;
+      if (meta.dir === "bool") {
+        if (v === 1 && (!best[k] || t.date > best[k].date)) best[k] = { value: 1, date: t.date };
+        return;
+      }
+      if (v === undefined || v === null || v === "") return;
+      const num = Number(v);
+      if (Number.isNaN(num)) return;
+      const better = !best[k] || (meta.dir === "max" ? num > best[k].value : num < best[k].value);
+      if (better) best[k] = { value: num, date: t.date };
+    });
+  });
+  return best;
+}
+
+function renderPersonalRecords() {
+  const wrap = document.getElementById("prList");
+  if (!wrap) return;
+  const best = computePersonalRecords();
+  const order = Object.keys(PR_META).filter(k => best[k]);
+  if (!order.length) {
+    wrap.innerHTML = `<p class="empty">Пока нет данных — рекорды появятся после первого прохождения теста-босса.</p>`;
+    return;
+  }
+  wrap.innerHTML = order.map(k => {
+    const meta = PR_META[k];
+    const rec = best[k];
+    const valText = meta.dir === "bool" ? "чисто пройдено" : `${rec.value}${meta.unit ? " " + meta.unit : ""}`;
+    return `<div class="history-row"><span class="d">${meta.label}</span><span class="pill good">${valText} · ${rec.date}</span></div>`;
+  }).join("");
 }
 
 function renderCharacter() {
   renderCharacterFigure();
+  renderPersonalRecords();
   const el = document.getElementById("ladder");
   el.innerHTML = "";
   const curIdx = rankIndex(state.character.rankKey);
@@ -1212,6 +1521,55 @@ document.getElementById("btnSaveStartDate").addEventListener("click", () => {
   save();
   toast(v ? `Дата старта сохранена: ${v}` : "Дата старта очищена");
   renderAll();
+});
+
+document.getElementById("btnExport").addEventListener("click", () => {
+  try {
+    const dataStr = JSON.stringify(state, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `connor-protocol-backup-${todayKey()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    document.getElementById("backupNote").textContent = `Скачано: ${todayKey()}. На iPhone файл может открыться в новой вкладке вместо прямого скачивания — тогда сохрани его через «Поделиться → Сохранить в Файлы».`;
+    toast("Резервная копия скачана");
+  } catch (e) {
+    toast("Не получилось скачать — попробуй ещё раз");
+  }
+});
+
+document.getElementById("btnImportTrigger").addEventListener("click", () => {
+  document.getElementById("importFile").click();
+});
+
+document.getElementById("importFile").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(reader.result);
+    } catch (err) {
+      alert("Не удалось прочитать файл — похоже, это не та резервная копия.");
+      return;
+    }
+    if (!parsed || typeof parsed !== "object" || !parsed.character) {
+      alert("Файл не похож на резервную копию «Протокола Коннор».");
+      return;
+    }
+    if (!confirm("Это заменит весь текущий прогресс в приложении данными из файла. Продолжить?")) return;
+    state = Object.assign(defaultState(), parsed);
+    save();
+    renderAll();
+    toast("Прогресс восстановлен из файла");
+  };
+  reader.readAsText(file);
+  e.target.value = ""; // сбрасываем, чтобы можно было выбрать тот же файл повторно
 });
 
 document.getElementById("btnReset").addEventListener("click", () => {
