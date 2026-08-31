@@ -421,6 +421,14 @@
       <p class="preview-note" id="previewNote" style="display:none;"></p>
       <div id="todaySlots" style="display:flex; flex-direction:column; gap:10px;"></div>
     </div>
+    <div class="card" id="sideQuestCard" style="display:none;">
+      <p class="card-label">Побочный квест дня</p>
+      <p style="margin:0 0 4px; font-size:14px;" id="sideQuestText"></p>
+      <p class="empty" id="sideQuestReward" style="margin:0 0 10px;"></p>
+      <div class="row-btns">
+        <button class="btn" id="btnSideQuest">Выполнил(а) — отметить</button>
+      </div>
+    </div>
   </section>
 
   <!-- ============ QUESTS / HISTORY ============ -->
@@ -1299,6 +1307,7 @@ function renderToday() {
   checkDayRollover();
   renderStartBanner();
   renderWeekStrip();
+  renderSideQuestCard();
 
   const view = currentViewDate();
   const rank = getRank(state.character.rankKey);
@@ -1367,6 +1376,61 @@ function renderToday() {
     }
   });
 }
+
+// -------- Побочный квест дня: одна маленькая доп. задача на каждый
+// тренировочный день (не в дни отдыха), отдельно от основного плана и от
+// «Слабого звена» — просто разовый бонус-вызов для разнообразия, с небольшой
+// прибавкой к статy. Одна отметка в день, доступна только на сегодня.
+const SIDE_QUESTS = [
+  { label: "10 отжиманий без остановки, в любом стиле", stat: "STR", amount: 3 },
+  { label: "50 приседаний за один заход (можно дробно, по 10)", stat: "STR", amount: 3 },
+  { label: "Планка, 90 секунд суммарно за день", stat: "STR", amount: 2 },
+  { label: "2 минуты скакалки или бега на месте без остановки", stat: "END", amount: 3 },
+  { label: "1 минута берпи в своём темпе", stat: "END", amount: 3 },
+  { label: "30 скручиваний на пресс", stat: "DISC", amount: 2 },
+  { label: "20 выпадов на каждую ногу", stat: "BAL", amount: 3 },
+  { label: "5 минут растяжки после тренировки", stat: "FLEX", amount: 3 },
+  { label: "30 секунд стойки на руках у стены (или честных попыток)", stat: "COORD", amount: 3 },
+];
+function pickSideQuest(key) {
+  const seed = (key.replaceAll("-", "") + "sidequest").split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  return SIDE_QUESTS[seed % SIDE_QUESTS.length];
+}
+function renderSideQuestCard() {
+  const card = document.getElementById("sideQuestCard");
+  if (!card) return;
+  const view = currentViewDate();
+  const isToday = isSameDay(view, new Date());
+  const rank = getRank(state.character.rankKey);
+  const plan = WEEK_PLANS[rank.weekPlan];
+  const slots = plan[view.getDay()] || [];
+  const isRestDay = slots.length === 0 || slots[0].type === "rest";
+  if (!isToday || isRestDay) { card.style.display = "none"; return; }
+  card.style.display = "";
+
+  const key = todayKey();
+  const quest = pickSideQuest(key);
+  const dLog = state.dailyLogs[key];
+  const done = !!(dLog && dLog.sideQuestDone);
+  document.getElementById("sideQuestText").textContent = quest.label;
+  document.getElementById("sideQuestReward").textContent = `Награда: +${quest.amount} к ${STAT_LABELS[quest.stat]}`;
+  const btn = document.getElementById("btnSideQuest");
+  btn.disabled = done;
+  btn.textContent = done ? "Выполнено сегодня ✓" : "Выполнил(а) — отметить";
+}
+document.getElementById("btnSideQuest").addEventListener("click", () => {
+  const key = todayKey();
+  const quest = pickSideQuest(key);
+  const dLog = state.dailyLogs[key] || { proteinG: 0, steps: 0, weightKg: null, workoutIds: [] };
+  if (dLog.sideQuestDone) return;
+  dLog.sideQuestDone = true;
+  state.dailyLogs[key] = dLog;
+  addXp({ [quest.stat]: quest.amount });
+  markActivity();
+  save();
+  renderAll();
+  toast(`Побочный квест выполнен — +${quest.amount} к ${STAT_LABELS[quest.stat]}`);
+});
 
 function completeSlot(slotId, slot, source, key) {
   key = key || todayKey();
