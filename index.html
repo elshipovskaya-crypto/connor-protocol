@@ -393,6 +393,10 @@
         <span class="qname">Вес, кг</span>
         <input type="number" id="inWeight" min="0" step="0.1">
       </div>
+      <div class="quest">
+        <span class="qname">Дневник (коротко: как прошёл день, что заметила)</span>
+        <input type="checkbox" id="inDiary" style="width:20px; height:20px; flex-shrink:0;">
+      </div>
       <div class="row-btns" style="margin-top:8px;">
         <button class="btn" id="btnSaveDaily">Сохранить</button>
         <span class="empty" id="dailySavedNote"></span>
@@ -1054,6 +1058,7 @@ function renderDashboard() {
   document.getElementById("inProtein").value = dLog.proteinG ?? "";
   document.getElementById("inSteps").value = dLog.steps ?? "";
   document.getElementById("inWeight").value = dLog.weightKg ?? "";
+  document.getElementById("inDiary").checked = !!dLog.diaryDone;
 
   // прогресс опыта до следующего ранга
   const nr = nextRank(rank.key);
@@ -1203,11 +1208,13 @@ document.getElementById("btnSaveDaily").addEventListener("click", () => {
     proteinG: Number(document.getElementById("inProtein").value) || 0,
     steps: Number(document.getElementById("inSteps").value) || 0,
     weightKg: Number(document.getElementById("inWeight").value) || null,
+    diaryDone: document.getElementById("inDiary").checked,
   };
   let disc = 0;
   if (state.dailyLogs[key].proteinG >= 100) disc += 2;
   if (state.dailyLogs[key].steps >= 8000) disc += 2;
   if (state.dailyLogs[key].weightKg) disc += 2;
+  if (state.dailyLogs[key].diaryDone) disc += 1;
   addXp({ DISC: disc });
   markActivity();
   save();
