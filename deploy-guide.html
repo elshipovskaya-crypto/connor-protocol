@@ -1,0 +1,379 @@
+<title>Протокол: Облако</title>
+<style>
+  :root {
+    --bg: #f3f1eb; --surface: #ffffff; --surface-2: #ebe8e0;
+    --ink: #201f1c; --ink-soft: #4c4a45; --muted: #8a8579; --line: #ddd8cc;
+    --accent: #3d4d52; --accent-soft: #e4e9ea;
+    --warn: #a8402b; --warn-soft: #f3e2dd;
+    --good: #4c6b4f; --good-soft: #e4ecdf;
+    --code-bg: #201f1c; --code-ink: #ece9e2; --code-muted: #8a8579; --code-line: #3a3833;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1a1917; --surface: #232220; --surface-2: #2b2a27;
+      --ink: #ece9e2; --ink-soft: #b8b4aa; --muted: #8a8579; --line: #3a3833;
+      --accent: #8fa8ad; --accent-soft: #2a3436;
+      --warn: #d97a5f; --warn-soft: #3a2620;
+      --good: #93b48f; --good-soft: #263127;
+      --code-bg: #0e100f; --code-ink: #d7f5e4; --code-muted: #6f8c7a; --code-line: #24312a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1a1917; --surface: #232220; --surface-2: #2b2a27;
+    --ink: #ece9e2; --ink-soft: #b8b4aa; --muted: #8a8579; --line: #3a3833;
+    --accent: #8fa8ad; --accent-soft: #2a3436;
+    --warn: #d97a5f; --warn-soft: #3a2620;
+    --good: #93b48f; --good-soft: #263127;
+    --code-bg: #0e100f; --code-ink: #d7f5e4; --code-muted: #6f8c7a; --code-line: #24312a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 15.5px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 740px; margin: 0 auto; padding: 40px 22px 100px; }
+  h1, h2, h3 { font-family: "Archivo", sans-serif; font-weight: 700; text-wrap: balance; margin: 0; }
+  .mono { font-family: "IBM Plex Mono", monospace; }
+
+  /* ---------- Header ---------- */
+  header.hero { margin-bottom: 34px; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--accent); margin: 0 0 10px;
+  }
+  h1.title { font-size: 2.1rem; letter-spacing: -0.01em; margin-bottom: 10px; }
+  .lede { font-size: 16px; color: var(--ink-soft); max-width: 60ch; margin: 0; }
+
+  /* ---------- Summary tiles (перекликается с KPI дашборда приложения) ---------- */
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 26px 0 34px; }
+  .tile {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 4px;
+    padding: 14px 14px 12px;
+  }
+  .tile .n { font-family: "IBM Plex Mono", monospace; font-size: 1.3rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tile .l { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+  /* ---------- TOC ---------- */
+  nav.toc {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 4px;
+    padding: 18px 20px; margin-bottom: 40px;
+  }
+  nav.toc p { margin: 0 0 10px; font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 24px; }
+  nav.toc li { margin-bottom: 7px; font-size: 13.5px; break-inside: avoid; }
+  nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line); }
+  nav.toc a:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- Phases ---------- */
+  section.phase { margin-bottom: 46px; scroll-margin-top: 20px; }
+  .phase-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px; }
+  .phase-num {
+    font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--accent);
+    background: var(--accent-soft); border-radius: 3px; padding: 3px 9px; flex-shrink: 0;
+  }
+  .phase-head h2 { font-size: 1.35rem; }
+  .phase-time { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--muted); margin-left: auto; white-space: nowrap; }
+  .phase-body { padding-left: 0; }
+  .phase-body p { margin: 0 0 14px; }
+  .phase-body ol, .phase-body ul { margin: 0 0 14px; padding-left: 22px; }
+  .phase-body li { margin-bottom: 7px; }
+  .phase-body li:last-child { margin-bottom: 0; }
+
+  /* ---------- Code blocks ---------- */
+  .code-wrap { margin: 0 0 16px; border-radius: 5px; overflow: hidden; border: 1px solid var(--code-line); }
+  .code-label {
+    background: var(--code-line); color: var(--code-muted); font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 14px;
+  }
+  pre {
+    margin: 0; background: var(--code-bg); color: var(--code-ink); padding: 16px 18px;
+    overflow-x: auto; font-family: "IBM Plex Mono", monospace; font-size: 12.5px; line-height: 1.65;
+  }
+  code { font-family: inherit; }
+
+  /* ---------- Callouts ---------- */
+  .why {
+    border-left: 3px solid var(--accent); background: var(--accent-soft);
+    border-radius: 0 4px 4px 0; padding: 12px 16px; margin: 0 0 16px; font-size: 13.5px; color: var(--ink-soft);
+  }
+  .why b { color: var(--ink); }
+  .warn-box {
+    border-left: 3px solid var(--warn); background: var(--warn-soft);
+    border-radius: 0 4px 4px 0; padding: 12px 16px; margin: 0 0 16px; font-size: 13.5px; color: var(--ink-soft);
+  }
+  .warn-box b { color: var(--ink); }
+
+  /* ---------- Checklist ---------- */
+  .checklist { list-style: none; margin: 0 0 14px; padding: 0; }
+  .checklist li {
+    display: flex; gap: 10px; align-items: flex-start; margin-bottom: 9px; font-size: 14px;
+  }
+  .checklist li::before {
+    content: ""; width: 16px; height: 16px; border: 1.5px solid var(--line); border-radius: 3px;
+    flex-shrink: 0; margin-top: 2px; background: var(--surface);
+  }
+
+  .divider { border: none; border-top: 1px solid var(--line); margin: 40px 0; }
+
+  footer { font-size: 12.5px; color: var(--muted); text-align: center; padding-top: 10px; }
+
+  @media (max-width: 560px) {
+    .tiles { grid-template-columns: 1fr 1fr; }
+    nav.toc ol { columns: 1; }
+    h1.title { font-size: 1.65rem; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow">Протокол Коннор — руководство по развёртыванию</p>
+    <h1 class="title">Вход через Google и облачный синк прогресса</h1>
+    <p class="lede">Сейчас весь прогресс живёт в localStorage одного браузера на одном телефоне. Ниже — пошаговый план, как добавить вход через Google и хранить те же данные в Firestore, чтобы прогресс не терялся при смене телефона и был виден с любого устройства под одним аккаунтом.</p>
+  </header>
+
+  <div class="tiles">
+    <div class="tile"><div class="n">~60</div><div class="l">минут работы</div></div>
+    <div class="tile"><div class="n">0 ₽</div><div class="l">бесплатный тариф Firebase</div></div>
+    <div class="tile"><div class="n">8</div><div class="l">этапов</div></div>
+  </div>
+
+  <nav class="toc">
+    <p>Содержание</p>
+    <ol>
+      <li><a href="#p1">Завести проект Firebase</a></li>
+      <li><a href="#p2">Включить вход через Google</a></li>
+      <li><a href="#p3">Завести Firestore и правила доступа</a></li>
+      <li><a href="#p4">Подключить SDK к приложению</a></li>
+      <li><a href="#p5">Кнопка входа и статус пользователя</a></li>
+      <li><a href="#p6">Переписать load() / save() на Firestore</a></li>
+      <li><a href="#p7">Разрешить домен GitHub Pages</a></li>
+      <li><a href="#p8">Проверка перед тем, как показывать кому-то ещё</a></li>
+    </ol>
+  </nav>
+
+  <section class="phase" id="p1">
+    <div class="phase-head">
+      <span class="phase-num">01</span>
+      <h2>Завести проект Firebase</h2>
+      <span class="phase-time">5 мин · без кода</span>
+    </div>
+    <div class="phase-body">
+      <ol>
+        <li>Открой <span class="mono">console.firebase.google.com</span>, войди тем же Google-аккаунтом, которым будешь пользоваться в приложении.</li>
+        <li>«Добавить проект» → назови, например, <span class="mono">connor-protocol</span> → «Continue». Мастер настройки периодически меняется: тумблер про Google Analytics может быть на этом же экране, на следующем шаге или не появиться вовсе — в любом из случаев его можно смело отключить (или пропустить), для этой задачи он не нужен и ничего не ломает, если остался включён.</li>
+        <li>Внутри проекта: значок <span class="mono">&lt;/&gt;</span> («Добавить приложение» → Web) → назови приложение так же → «Зарегистрировать». Firebase покажет блок <span class="mono">firebaseConfig</span> с ключами — он понадобится в этапе 4, скопируй его целиком в заметки.</li>
+      </ol>
+      <div class="why"><b>Важно понимать:</b> ключи из <span class="mono">firebaseConfig</span> (apiKey и т.д.) будут видны прямо в коде страницы — это нормально и ожидаемо для Firebase. Они не секретные в том смысле, в каком секретен пароль: защита данных обеспечивается не их скрытостью, а правилами доступа Firestore из этапа 3.</div>
+    </div>
+  </section>
+
+  <section class="phase" id="p2">
+    <div class="phase-head">
+      <span class="phase-num">02</span>
+      <h2>Включить вход через Google</h2>
+      <span class="phase-time">2 мин · без кода</span>
+    </div>
+    <div class="phase-body">
+      <ol>
+        <li>В левом меню консоли: <span class="mono">Build → Authentication</span> → «Get started».</li>
+        <li>Вкладка «Sign-in method» → выбрать «Google» из списка провайдеров → включить тумблер → указать email поддержки (свой) → «Сохранить».</li>
+      </ol>
+      <p>Больше здесь ничего настраивать не нужно — Google как способ входа теперь доступен проекту.</p>
+    </div>
+  </section>
+
+  <section class="phase" id="p3">
+    <div class="phase-head">
+      <span class="phase-num">03</span>
+      <h2>Завести Firestore и правила доступа</h2>
+      <span class="phase-time">5 мин · немного кода</span>
+    </div>
+    <div class="phase-body">
+      <ol>
+        <li>В меню консоли: <span class="mono">Build → Firestore Database</span> → «Create database» → режим «Production mode» → выбрать регион (любой европейский, ближе к тебе) → «Enable».</li>
+        <li>Вкладка «Rules» — заменить содержимое на правило ниже и нажать «Publish». Оно разрешает читать и писать документ только тому, кто в него залогинен как владелец.</li>
+      </ol>
+      <div class="code-wrap">
+        <p class="code-label">firestore.rules</p>
+        <pre><code>rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid}/state/main {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}</code></pre>
+      </div>
+      <div class="why"><b>Зачем это отдельным этапом:</b> без явного правила Firestore в режиме Production по умолчанию блокирует вообще всё чтение и запись. Это правило — единственное место, где можно ошибиться так, что чужой прогресс станет читаемым, поэтому стоит перепроверить его один раз здесь, а не на глаз в коде приложения.</div>
+    </div>
+  </section>
+
+  <section class="phase" id="p4">
+    <div class="phase-head">
+      <span class="phase-num">04</span>
+      <h2>Подключить SDK к приложению</h2>
+      <span class="phase-time">5 мин · код</span>
+    </div>
+    <div class="phase-body">
+      <p>В <span class="mono">index.html</span>, перед закрывающим тегом <span class="mono">&lt;/head&gt;</span> (после существующей строки со шрифтами) добавить три скрипта и вставить свой <span class="mono">firebaseConfig</span> из этапа 1:</p>
+      <div class="code-wrap">
+        <p class="code-label">index.html · &lt;head&gt;</p>
+        <pre><code>&lt;script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"&gt;&lt;/script&gt;
+&lt;script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"&gt;&lt;/script&gt;
+&lt;script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  const firebaseConfig = {
+    apiKey: "...",
+    authDomain: "connor-protocol.firebaseapp.com",
+    projectId: "connor-protocol",
+    // ...остальные поля — вставить как скопировалось из консоли
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+&lt;/script&gt;</code></pre>
+      </div>
+      <p>Используется «compat»-сборка SDK — она работает через обычные <span class="mono">&lt;script&gt;</span>-теги и глобальный объект <span class="mono">firebase</span>, без сборщиков и модулей. Это совпадает с тем, как уже устроено приложение (один файл, никакого npm), так что менять больше ничего в структуре не придётся.</p>
+    </div>
+  </section>
+
+  <section class="phase" id="p5">
+    <div class="phase-head">
+      <span class="phase-num">05</span>
+      <h2>Кнопка входа и статус пользователя</h2>
+      <span class="phase-time">10 мин · код</span>
+    </div>
+    <div class="phase-body">
+      <p>В шапку (<span class="mono">header.top</span>) — рядом с плашкой ранга — добавить кнопку входа/статус:</p>
+      <div class="code-wrap">
+        <p class="code-label">index.html · разметка шапки</p>
+        <pre><code>&lt;button class="btn" id="btnGoogleAuth" style="font-size:11px; padding:6px 10px;"&gt;Войти через Google&lt;/button&gt;</code></pre>
+      </div>
+      <p>И в конце основного скрипта — обработчик клика и слушатель состояния входа:</p>
+      <div class="code-wrap">
+        <p class="code-label">index.html · основной &lt;script&gt;</p>
+        <pre><code>document.getElementById("btnGoogleAuth").addEventListener("click", () => {
+  if (auth.currentUser) { auth.signOut(); return; }
+  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+});
+
+auth.onAuthStateChanged(async (user) => {
+  const btn = document.getElementById("btnGoogleAuth");
+  if (!user) { btn.textContent = "Войти через Google"; return; }
+  btn.textContent = `Выйти (${user.displayName?.split(" ")[0] || "аккаунт"})`;
+  await syncFromCloudOnLogin(user.uid);
+});</code></pre>
+      </div>
+      <p>Функция <span class="mono">syncFromCloudOnLogin</span> — из следующего этапа: она решает, откуда брать данные при входе — из облака или поднять то, что уже накопилось локально.</p>
+    </div>
+  </section>
+
+  <section class="phase" id="p6">
+    <div class="phase-head">
+      <span class="phase-num">06</span>
+      <h2>Переписать load() / save() на Firestore</h2>
+      <span class="phase-time">15 мин · код, самый важный этап</span>
+    </div>
+    <div class="phase-body">
+      <p>Сейчас в приложении:</p>
+      <div class="code-wrap">
+        <p class="code-label">index.html · как сейчас</p>
+        <pre><code>function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return defaultState();
+    const parsed = JSON.parse(raw);
+    return Object.assign(defaultState(), parsed);
+  } catch (e) { return defaultState(); }
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+}</code></pre>
+      </div>
+      <p><span class="mono">localStorage</span> остаётся как есть — это офлайн-кэш и подстраховка. Поверх добавляется синк с Firestore, когда есть вход и сеть:</p>
+      <div class="code-wrap">
+        <p class="code-label">index.html · добавить рядом с load()/save()</p>
+        <pre><code>function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+  if (auth.currentUser) pushToCloud();
+}
+
+let pushTimer = null;
+function pushToCloud() {
+  // Небольшая задержка (debounce), чтобы не писать в Firestore на каждый
+  // клик отдельно — только когда изменения улеглись.
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => {
+    const uid = auth.currentUser.uid;
+    db.collection("users").doc(uid).collection("state").doc("main")
+      .set({ ...state, updatedAt: Date.now() })
+      .catch((e) => console.error("Не удалось сохранить в облако:", e));
+  }, 1500);
+}
+
+async function syncFromCloudOnLogin(uid) {
+  const ref = db.collection("users").doc(uid).collection("state").doc("main");
+  const snap = await ref.get();
+  if (!snap.exists) {
+    // В облаке пусто — это первый вход. Поднимаем то, что уже накоплено
+    // локально, чтобы старый прогресс не потерялся при переходе на аккаунт.
+    await ref.set({ ...state, updatedAt: Date.now() });
+    toast("Локальный прогресс загружен в облако");
+    return;
+  }
+  const cloud = snap.data();
+  // Более новая версия побеждает — по времени последнего сохранения.
+  const localIsNewer = (state.meta?.updatedAt || 0) > (cloud.updatedAt || 0);
+  if (!localIsNewer) {
+    state = Object.assign(defaultState(), cloud);
+    save();
+    renderAll();
+    toast("Прогресс загружен из облака");
+  }
+}</code></pre>
+      </div>
+      <div class="why"><b>Почему именно так:</b> при одном пользователе на одном активном устройстве конфликтов записи не бывает, поэтому не нужна сложная синхронизация — «более новое побеждает» полностью достаточно. localStorage остаётся источником правды офлайн: если сети нет, приложение работает как сейчас и просто досинхронизируется, когда сеть появится (следующий вызов <span class="mono">save()</span>).</div>
+      <div class="warn-box"><b>Не забыть:</b> в <span class="mono">defaultState()</span> нет поля <span class="mono">updatedAt</span> — его стоит завести (например, внутри <span class="mono">meta</span>) и проставлять при каждом <span class="mono">save()</span>, иначе сравнение «что новее» работать не будет.</div>
+    </div>
+  </section>
+
+  <section class="phase" id="p7">
+    <div class="phase-head">
+      <span class="phase-num">07</span>
+      <h2>Разрешить домен GitHub Pages</h2>
+      <span class="phase-time">2 мин · без кода</span>
+    </div>
+    <div class="phase-body">
+      <ol>
+        <li>Firebase Console → <span class="mono">Authentication → Settings → Authorized domains</span>.</li>
+        <li>«Add domain» → вписать адрес вида <span class="mono">твой-логин.github.io</span> (без <span class="mono">https://</span> и без пути к репозиторию).</li>
+      </ol>
+      <p>Без этого шага вход через Google будет работать только при открытии файла локально или на <span class="mono">localhost</span> — на реальном адресе GitHub Pages окно входа выдаст ошибку домена.</p>
+    </div>
+  </section>
+
+  <section class="phase" id="p8">
+    <div class="phase-head">
+      <span class="phase-num">08</span>
+      <h2>Проверка перед тем, как показывать кому-то ещё</h2>
+      <span class="phase-time">10 мин</span>
+    </div>
+    <div class="phase-body">
+      <ul class="checklist">
+        <li>Вход через Google на реальном адресе GitHub Pages (не только локально) открывает окно выбора аккаунта и возвращает в приложение.</li>
+        <li>После первого входа с уже накопленным локальным прогрессом — в Firestore (вкладка Data в консоли) появился документ с теми же данными.</li>
+        <li>Отметить что-нибудь в приложении → обновить страницу → прогресс на месте.</li>
+        <li>Выйти → зайти на другом браузере/устройстве тем же аккаунтом → виден тот же прогресс.</li>
+        <li>Выключить вайфай, отметить тренировку — приложение не падает, работает как обычная локальная версия.</li>
+        <li>Открыть Firestore Rules Playground (или попробовать зайти вторым тестовым Google-аккаунтом) и убедиться, что чужой документ не читается.</li>
+      </ul>
+      <div class="why"><b>Резервную копию всё равно стоит оставить:</b> кнопки «Скачать резервную копию» / «Восстановить из файла» никуда не делись и продолжают работать поверх облака — лишняя подстраховка на случай, если что-то в синхронизации пойдёт не так, ничего не стоит.</div>
+    </div>
+  </section>
+
+  <hr class="divider">
+  <footer>Протокол Коннор · руководство по добавлению входа через Google и Firestore</footer>
+
+</div>

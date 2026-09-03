@@ -332,7 +332,11 @@
 
 <header class="top">
   <span class="brand">Протокол Коннор</span>
-  <span class="rank mono" id="hdrRank">Новичок</span>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span class="rank mono" id="authStatus" style="display:none;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+    <button id="btnGoogleAuth" class="mono" style="font-size:11px;padding:3px 9px;border-radius:3px;border:1px solid var(--line);background:transparent;color:var(--ink-soft);cursor:pointer;">Войти</button>
+    <span class="rank mono" id="hdrRank">Новичок</span>
+  </div>
 </header>
 
 <main>
@@ -377,6 +381,11 @@
     <div class="card" id="etaCard">
       <p class="card-label">Прогноз: финальный ранг</p>
       <p class="empty" id="etaText" style="font-style:normal;"></p>
+    </div>
+
+    <div class="card" id="rewardsCard">
+      <p class="card-label">Награды</p>
+      <div id="rewardsList" style="display:flex; flex-direction:column; gap:16px;"></div>
     </div>
 
     <div class="card">
@@ -617,13 +626,34 @@
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script>
 /* ======================================================================
    ПРОТОКОЛ КОННОР — скелет приложения
-   Хранение: localStorage, ключ "connorProtocolState"
+   Хранение: localStorage (офлайн-копия), ключ "connorProtocolState",
+   + облачная синхронизация через Firebase (Google-вход + Firestore).
    ====================================================================== */
 
 const STORE_KEY = "connorProtocolState";
+
+// -------- Firebase: вход через Google + облачное хранилище прогресса.
+// apiKey тут не секретный — реальная защита данных на стороне Firestore
+// (см. security rules: доступ только у владельца по request.auth.uid).
+const firebaseConfig = {
+  apiKey: "AIzaSyBmO-YXvbFMMslx1yuMHHvnJuMJKg6rDfg",
+  authDomain: "connor-protocol.firebaseapp.com",
+  projectId: "connor-protocol",
+  storageBucket: "connor-protocol.firebasestorage.app",
+  messagingSenderId: "616709506103",
+  appId: "1:616709506103:web:5479c25c3d240e7cae6bb2"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+let currentUid = null;
+let pushTimer = null;
 
 const STATS = ["STR","END","FLEX","BAL","COORD","DISC"];
 const STAT_LABELS = { STR:"СИЛ", END:"ВЫН", FLEX:"КОНТ", BAL:"БАЛ", COORD:"КООРД", DISC:"ДИСЦ" };
@@ -850,7 +880,11 @@ function defaultState() {
     statHistory: [],      // {date, stats:{...}} — один снимок в день, для графика по неделям
     challengeMeta: {},    // key -> {prevStreak, timesCompleted, lastCompletedDate}
     settings: { startDate: null }, // дата старта программы, YYYY-MM-DD
-    meta: { firstActivityDate: null }, // дата ПЕРВОГО реального лога (не запуска!) — до неё челленджи = 0
+    meta: { firstActivityDate: null, updatedAt: null }, // updatedAt — метка времени последнего сохранения, для сравнения локальной и облачной копии при входе
+    rewards: {
+      perfectWeekClaimed: {},   // weekStartKey -> true, повторяемая награда, раз в неделю
+      sideQuestTiersClaimed: [], // [5, 15, ...] — какие ступени уже получены, одноразово
+    },
   };
 }
 let state = load();
@@ -864,7 +898,42 @@ function load() {
   } catch (e) { return defaultState(); }
 }
 function save() {
+  state.meta.updatedAt = Date.now();
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+  if (currentUid) {
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushToCloud, 1500);
+  }
+}
+
+function pushToCloud() {
+  if (!currentUid) return;
+  db.collection("users").doc(currentUid).collection("state").doc("main")
+    .set(state)
+    .catch((e) => console.error("Ошибка синхронизации с облаком:", e));
+}
+
+function syncFromCloudOnLogin(uid) {
+  db.collection("users").doc(uid).collection("state").doc("main").get()
+    .then((doc) => {
+      if (!doc.exists) {
+        // в облаке ещё ничего нет — заливаем туда то, что накопилось локально
+        pushToCloud();
+        return;
+      }
+      const cloud = doc.data();
+      const localUpdated = (state.meta && state.meta.updatedAt) || 0;
+      const cloudUpdated = (cloud.meta && cloud.meta.updatedAt) || 0;
+      if (cloudUpdated > localUpdated) {
+        state = Object.assign(defaultState(), cloud);
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+        renderAll();
+        toast("Прогресс загружен из облака");
+      } else if (localUpdated > cloudUpdated) {
+        pushToCloud();
+      }
+    })
+    .catch((e) => console.error("Ошибка чтения из облака:", e));
 }
 
 // ВАЖНО: намеренно НЕ используем d.toISOString() — он возвращает дату в UTC,
@@ -1086,6 +1155,96 @@ function renderDashboard() {
 
   renderWeakLinkCard();
   renderEtaCard();
+  renderRewards();
+}
+
+// -------- Награды: отдельный слой между ежедневными квестами (+1..+4 XP) и
+// полноценным рангом (сотни XP) — небольшие, но ощутимые бонусы, которые
+// нужно осознанно «забрать» кнопкой, а не получить автоматически.
+// «Идеальная неделя» — повторяемая, раз в неделю (сбрасывается с новой
+// неделей за счёт ключа weekStartKey). «Побочные квесты» — одноразовые
+// ступени по накопительному счётчику за всё время.
+const SIDE_QUEST_TIERS = [
+  { threshold: 5, reward: 5 },
+  { threshold: 15, reward: 8 },
+  { threshold: 30, reward: 12 },
+];
+function countSideQuestsDone() {
+  return Object.values(state.dailyLogs).filter(l => l && l.sideQuestDone).length;
+}
+function claimReward(amount, label) {
+  const weakest = getWeakestStat();
+  addXp({ [weakest.key]: amount });
+  save();
+  renderAll();
+  toast(`${label} — +${amount} к ${STAT_LABELS[weakest.key]}`);
+}
+function renderRewards() {
+  const wrap = document.getElementById("rewardsList");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+
+  // --- Идеальная неделя ---
+  const rank = getRank(state.character.rankKey);
+  const wk = weekStartKey();
+  const wLog = state.weeklyLogs[wk] || { sessionsDone: 0 };
+  const done = wLog.sessionsDone || 0;
+  const target = rank.sessionsPerWeek;
+  const pct1 = Math.min(100, Math.round((done / target) * 100));
+  const claimedThisWeek = !!state.rewards.perfectWeekClaimed[wk];
+  const ready1 = done >= target && !claimedThisWeek;
+  const box1 = document.createElement("div");
+  box1.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:4px;">
+      <span style="font-family:'Archivo',sans-serif; font-weight:600; font-size:13.5px;">Идеальная неделя</span>
+      ${claimedThisWeek ? '<span class="pill good">получено ✓</span>' : `<span class="stat-val">${done}/${target}</span>`}
+    </div>
+    <div class="stat-track"><div class="stat-fill" style="width:${pct1}%"></div></div>
+    <div class="empty" style="margin-top:4px;">Все тренировки недели по плану выполнены. Повторяемая награда — раз в неделю, +6 к самому слабому стату.</div>
+    ${ready1 ? `<div class="row-btns" style="margin-top:8px;"><button class="btn" id="btnClaimPerfectWeek">Получить награду</button></div>` : ""}
+  `;
+  wrap.appendChild(box1);
+  if (ready1) {
+    box1.querySelector("#btnClaimPerfectWeek").addEventListener("click", () => {
+      state.rewards.perfectWeekClaimed[wk] = true;
+      claimReward(6, "Идеальная неделя");
+    });
+  }
+
+  // --- Побочные квесты (ступени) ---
+  const count = countSideQuestsDone();
+  const claimedTiers = state.rewards.sideQuestTiersClaimed;
+  const nextTier = SIDE_QUEST_TIERS.find(t => !claimedTiers.includes(t.threshold));
+  const box2 = document.createElement("div");
+  if (!nextTier) {
+    box2.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:4px;">
+        <span style="font-family:'Archivo',sans-serif; font-weight:600; font-size:13.5px;">Побочные квесты</span>
+        <span class="pill good">все ступени получены 🏆</span>
+      </div>
+      <div class="empty">Пройдено побочных квестов за всё время: ${count}. Все три ступени (5 / 15 / 30) уже получены.</div>
+    `;
+  } else {
+    const pct2 = Math.min(100, Math.round((count / nextTier.threshold) * 100));
+    const ready2 = count >= nextTier.threshold;
+    const tiersDoneNote = claimedTiers.length ? ` · ступеней получено: ${claimedTiers.length}` : "";
+    box2.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:4px;">
+        <span style="font-family:'Archivo',sans-serif; font-weight:600; font-size:13.5px;">Побочные квесты</span>
+        <span class="stat-val">${count}/${nextTier.threshold}</span>
+      </div>
+      <div class="stat-track"><div class="stat-fill" style="width:${pct2}%"></div></div>
+      <div class="empty" style="margin-top:4px;">Накопительный счётчик выполненных побочных квестов за всё время. Эта ступень — одноразово +${nextTier.reward} к самому слабому стату${tiersDoneNote}.</div>
+      ${ready2 ? `<div class="row-btns" style="margin-top:8px;"><button class="btn" id="btnClaimSideQuestTier">Получить награду</button></div>` : ""}
+    `;
+  }
+  wrap.appendChild(box2);
+  if (nextTier && count >= nextTier.threshold) {
+    box2.querySelector("#btnClaimSideQuestTier").addEventListener("click", () => {
+      state.rewards.sideQuestTiersClaimed.push(nextTier.threshold);
+      claimReward(nextTier.reward, "Побочные квесты");
+    });
+  }
 }
 
 // -------- «Слабое звено»: мини-упражнение на самый слабый стат прямо сейчас,
@@ -1872,6 +2031,38 @@ document.querySelectorAll("nav.tabbar button").forEach(btn => {
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
     document.getElementById(`view-${btn.dataset.view}`).classList.add("active");
   });
+});
+
+// ---------------------------------------------------------------------
+// АВТОРИЗАЦИЯ И ОБЛАЧНАЯ СИНХРОНИЗАЦИЯ
+// ---------------------------------------------------------------------
+const btnGoogleAuth = document.getElementById("btnGoogleAuth");
+const authStatusEl = document.getElementById("authStatus");
+
+btnGoogleAuth.addEventListener("click", () => {
+  if (currentUid) {
+    auth.signOut();
+    return;
+  }
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch((e) => {
+    console.error("Ошибка входа:", e);
+    toast("Не удалось войти через Google");
+  });
+});
+
+auth.onAuthStateChanged((user) => {
+  if (user) {
+    currentUid = user.uid;
+    btnGoogleAuth.textContent = "Выйти";
+    authStatusEl.style.display = "";
+    authStatusEl.textContent = user.email || user.displayName || "в сети";
+    syncFromCloudOnLogin(user.uid);
+  } else {
+    currentUid = null;
+    btnGoogleAuth.textContent = "Войти";
+    authStatusEl.style.display = "none";
+  }
 });
 
 function renderAll() {
