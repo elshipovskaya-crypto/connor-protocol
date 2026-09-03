@@ -19,8 +19,7 @@
     --accent: #3d4d52; --accent-soft: #e4e9ea;
     --warn: #a8402b; --warn-soft: #f3e2dd;
     --good: #4c6b4f; --good-soft: #e4ecdf;
-    --on-bright: #fff; /* цвет текста поверх заливки var(--accent)/var(--good) — обычно белый,
-                           но на ярких неоновых фонах (тема «ретро-терминал») он не читается */
+    --on-bright: #fff; /* цвет текста поверх заливки var(--accent)/var(--good) */
     --radius: 3px;
   }
   @media (prefers-color-scheme: dark) {
@@ -38,31 +37,6 @@
     --accent: #8fa8ad; --accent-soft: #2a3436;
     --warn: #d97a5f; --warn-soft: #3a2620;
     --good: #93b48f; --good-soft: #263127;
-  }
-  /* Ретро-терминал — отдельная тема «для настроения», переключается вручную
-     кнопкой на вкладке «Персонаж» и не зависит от системной светлой/тёмной
-     темы (data-theme) — оба атрибута независимы, но эта тема, если включена,
-     полностью перекрывает палитру. */
-  :root[data-scheme="terminal"] {
-    --bg: #030b06; --surface: #081a10; --surface-2: #0e2818;
-    --ink: #6dffa0; --ink-soft: #4fdc85; --muted: #2f7a52; --line: #17402a;
-    --accent: #39ff6a; --accent-soft: #0f2e1c;
-    --warn: #ff6b4d; --warn-soft: #331812;
-    --good: #39ff6a; --good-soft: #0f2e1c;
-    /* Белый текст на ярком неоновом зелёном (--accent/--good) почти не читается —
-       здесь вместо него берём тёмный, почти чёрный зелёный. */
-    --on-bright: #04140a;
-  }
-  :root[data-scheme="terminal"] body {
-    font-family: "IBM Plex Mono", monospace;
-    text-shadow: 0 0 1px rgba(109, 255, 160, 0.35);
-  }
-  :root[data-scheme="terminal"] body::after {
-    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 15;
-    background: repeating-linear-gradient(
-      to bottom, rgba(0,0,0,0.16) 0px, rgba(0,0,0,0.16) 1px, transparent 1px, transparent 3px
-    );
-    mix-blend-mode: multiply; opacity: 0.55;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
@@ -116,6 +90,23 @@
     font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.08em;
     text-transform: uppercase; color: var(--muted); margin: 0 0 10px;
   }
+
+  /* ---------- Распорядок дня — стилизовано под «распечатку», монохромный
+     моноширинный шрифт для времени, независимо от выбранной темы ---------- */
+  .sched-row { display: flex; gap: 14px; align-items: baseline; padding: 7px 0; }
+  .sched-row + .sched-row { border-top: 1px dashed var(--line); }
+  .sched-time {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted);
+    width: 92px; flex-shrink: 0;
+  }
+  .sched-label { font-size: 13.5px; color: var(--ink); }
+  .sched-row.past { opacity: 0.45; }
+  .sched-row.past .sched-label { text-decoration: line-through; }
+  .sched-row.current {
+    background: var(--accent-soft); margin: 0 -18px; padding: 7px 18px; border-radius: 3px;
+  }
+  .sched-row.current .sched-time { color: var(--accent); font-weight: 600; }
+  .sched-row.current .sched-label { font-weight: 600; }
 
   /* ---------- Stat bars ---------- */
   .stat-row { display: grid; grid-template-columns: 96px 1fr 46px; align-items: center; gap: 12px; padding: 7px 0; }
@@ -421,6 +412,10 @@
       <p class="preview-note" id="previewNote" style="display:none;"></p>
       <div id="todaySlots" style="display:flex; flex-direction:column; gap:10px;"></div>
     </div>
+    <div class="card" id="scheduleCard" style="display:none;">
+      <p class="card-label">Распорядок буднего дня</p>
+      <div id="scheduleList"></div>
+    </div>
     <div class="card" id="sideQuestCard" style="display:none;">
       <p class="card-label">Побочный квест дня</p>
       <p style="margin:0 0 4px; font-size:14px;" id="sideQuestText"></p>
@@ -570,13 +565,6 @@
         <button class="btn" id="btnSaveStartDate">Сохранить</button>
       </div>
       <p class="empty" id="startDateNote" style="margin-top:8px;"></p>
-    </div>
-    <div class="card">
-      <p class="card-label">Оформление</p>
-      <div class="row-btns">
-        <button class="btn" id="btnToggleTheme">Тема: обычная</button>
-      </div>
-      <p class="empty" style="margin-top:8px;">Ретро-терминал — альтернативная зелёная монохромная тема со сканлайнами, чисто для настроения. Работает независимо от системной светлой/тёмной темы.</p>
     </div>
     <div class="card">
       <p class="card-label">Статы</p>
@@ -857,7 +845,7 @@ function defaultState() {
     measurements: [],     // {date, waist, hips, chest, arm}
     statHistory: [],      // {date, stats:{...}} — один снимок в день, для графика по неделям
     challengeMeta: {},    // key -> {prevStreak, timesCompleted, lastCompletedDate}
-    settings: { startDate: null, scheme: "default" }, // дата старта, scheme: "default"|"terminal"
+    settings: { startDate: null }, // дата старта программы, YYYY-MM-DD
     meta: { firstActivityDate: null }, // дата ПЕРВОГО реального лога (не запуска!) — до неё челленджи = 0
   };
 }
@@ -1207,21 +1195,6 @@ function renderEtaCard() {
   }
 }
 
-// -------- Оформление: переключаемая тема «ретро-терминал», отдельно от
-// системной светлой/тёмной темы. Хранится в settings.scheme, применяется
-// атрибутом data-scheme на <html>.
-function applyScheme() {
-  const scheme = state.settings.scheme || "default";
-  document.documentElement.setAttribute("data-scheme", scheme);
-  const btn = document.getElementById("btnToggleTheme");
-  if (btn) btn.textContent = scheme === "terminal" ? "Тема: ретро-терминал (вкл.)" : "Тема: обычная";
-}
-document.getElementById("btnToggleTheme").addEventListener("click", () => {
-  state.settings.scheme = state.settings.scheme === "terminal" ? "default" : "terminal";
-  save();
-  applyScheme();
-});
-
 document.getElementById("btnSaveDaily").addEventListener("click", () => {
   const key = todayKey();
   const existing = state.dailyLogs[key] || { workoutIds: [] };
@@ -1303,10 +1276,58 @@ function renderWeekStrip() {
   }
 }
 
+// -------- Распорядок буднего дня: фиксированное расписание питания и
+// тренировок на Пн–Пт (тренировки/эллипс/приёмы пищи по времени), отдельно
+// от плана тренировок недели — просто справочный «дневной ритм». В выходные
+// не показывается, у них другой режим.
+const WEEKDAY_SCHEDULE = [
+  { time: "08:00", label: "Тренировка" },
+  { time: "09:00", label: "Завтрак (плотный)" },
+  { time: "11:30", label: "Перекус" },
+  { time: "13:00–13:15", label: "Обед (средний, не тяжёлый)" },
+  { time: "15:00", label: "Тренировка" },
+  { time: "16:00–16:30", label: "Перекус белок (протеин + углевод)" },
+  { time: "18:30–19:00", label: "Ужин (лёгкий)" },
+  { time: "20:30", label: "Кардио эллипс" },
+  { time: "21:30", label: "Перекус белок (протеин)" },
+];
+function scheduleTimeToMinutes(t) {
+  const start = t.split(/[–-]/)[0].trim();
+  const [h, m] = start.split(":").map(Number);
+  return h * 60 + m;
+}
+function renderScheduleCard() {
+  const card = document.getElementById("scheduleCard");
+  if (!card) return;
+  const view = currentViewDate();
+  const dow = view.getDay(); // 0 Вс .. 6 Сб
+  const isWeekday = dow >= 1 && dow <= 5;
+  if (!isWeekday) { card.style.display = "none"; return; }
+  card.style.display = "";
+
+  const isToday = isSameDay(view, new Date());
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const items = WEEKDAY_SCHEDULE.map(item => ({ ...item, mins: scheduleTimeToMinutes(item.time) }));
+  let currentIdx = -1;
+  if (isToday) {
+    items.forEach((item, i) => { if (item.mins <= nowMin) currentIdx = i; });
+  }
+  const wrap = document.getElementById("scheduleList");
+  wrap.innerHTML = items.map((item, i) => {
+    const cls = !isToday ? "" : i < currentIdx ? "past" : i === currentIdx ? "current" : "";
+    return `<div class="sched-row ${cls}">
+      <span class="sched-time">${item.time}</span>
+      <span class="sched-label">${item.label}</span>
+    </div>`;
+  }).join("");
+}
+
 function renderToday() {
   checkDayRollover();
   renderStartBanner();
   renderWeekStrip();
+  renderScheduleCard();
   renderSideQuestCard();
 
   const view = currentViewDate();
@@ -1853,7 +1874,6 @@ function renderAll() {
   renderBoss();
   renderCharacter();
 }
-applyScheme();
 renderAll();
 
 // Если приложение полежало свёрнутым (в фоне на телефоне) и была открыта не
@@ -1861,6 +1881,10 @@ renderAll();
 // молча замереть на дне сворачивания до следующего клика.
 document.addEventListener("visibilitychange", () => { if (!document.hidden) renderAll(); });
 window.addEventListener("focus", renderAll);
+
+// Подсветка «текущего» пункта в распорядке дня зависит от часов — обновляем
+// раз в минуту, пока вкладка открыта, чтобы не ждать следующего клика.
+setInterval(() => { if (!document.hidden) renderScheduleCard(); }, 60000);
 
 // ---------------------------------------------------------------------
 // PWA: кэширование через сервис-воркер намеренно ОТКЛЮЧЕНО на время активной
